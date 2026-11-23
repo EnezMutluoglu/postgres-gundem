@@ -22,6 +22,7 @@ from admin import register
 import feeds
 import community
 import news_search
+import translation_jobs as tasks
 
 ROOT = Path(__file__).resolve().parent
 DATA = Path(os.environ.get("GUNDEM_DATA", ROOT / ".data"))
@@ -70,6 +71,7 @@ def initialize():
           CREATE TABLE IF NOT EXISTS texts(original TEXT PRIMARY KEY, translation TEXT NOT NULL);
           CREATE TABLE IF NOT EXISTS sources(name TEXT PRIMARY KEY, success TEXT, error TEXT);
         """)
+        tasks.setup(con)
         community.setup(con)
         news_search.setup(con)
         # Apply the same checks to translations produced by earlier releases.
@@ -91,6 +93,7 @@ def save(source, items):
     with db() as con:
         con.execute("BEGIN IMMEDIATE")
         seq = con.execute("SELECT coalesce(max(seq),0) FROM items").fetchone()[0]
+        initial_seq = seq
         for item in items:
             data = json.dumps(item, sort_keys=True, ensure_ascii=False)
             old = con.execute(
@@ -105,7 +108,8 @@ def save(source, items):
                 "INSERT OR REPLACE INTO items VALUES(?,?,?,?,?)",
                 row,
             )
-    work.set()
+    if seq != initial_seq:
+        work.set()
 
 
 def state(key, value):
@@ -433,7 +437,7 @@ def model_text(original, *, explicit_terms=False, literal=False, source_lang="en
             data=json.dumps(payload).encode(),
             headers={"Content-Type": "application/json"},
         )
-        with urlopen(req, timeout=MODEL_TIMEOUT) as response:
+        with urlopen(req, timeout=tasks.timeout(MODEL_TIMEOUT)) as response:
             result = json.load(response)
         answer = result["content"].strip()
         if not answer or result.get("stop_type") == "limit" or result.get("truncated"):
@@ -447,7 +451,7 @@ def model_text(original, *, explicit_terms=False, literal=False, source_lang="en
             data=json.dumps({"text": original}).encode(),
             headers={"Content-Type": "application/json"},
         )
-        with urlopen(req, timeout=MODEL_TIMEOUT) as result:
+        with urlopen(req, timeout=tasks.timeout(MODEL_TIMEOUT)) as result:
             answer = json.load(result)["text"].strip()
         if not answer or (answer == original and len(original.split()) > 4):
             raise ValueError("Eksik çeviri")
@@ -489,7 +493,7 @@ def model_text(original, *, explicit_terms=False, literal=False, source_lang="en
         data=json.dumps(prompt).encode(),
         headers={"Content-Type": "application/json"},
     )
-    with urlopen(req, timeout=MODEL_TIMEOUT) as result:
+    with urlopen(req, timeout=tasks.timeout(MODEL_TIMEOUT)) as result:
         choice = json.load(result)["choices"][0]
     answer = choice["message"]["content"].strip()
     if (
@@ -506,20 +510,25 @@ TECHNICAL = re.compile(
 )
 
 
-def translate(original):
+def translate(original, *, guided=False):
     upgrade = re.fullmatch(
         r"Upgrade from (\d+(?:\.\d+)+) to (\d+(?:\.\d+)+)\.", original
     )
     if upgrade:
         return f"{upgrade[1]} sürümünden {upgrade[2]} sürümüne yükseltin."
-    if len(original) > 1000:
+    if len(original) > 1000 or guided:
         pieces = SENTENCE_BREAK.split(original)
         if len(pieces) > 1:
-            return " ".join(translate(p) for p in pieces)
+            return " ".join(translate(p, guided=guided) for p in pieces)
     expected = sorted(TECHNICAL.findall(original))
     terms = glossary_for(original)
     try:
-        result = normalize_translation(original, model_text(original))
+        answer = (
+            model_text(original, explicit_terms=True, literal=True)
+            if guided
+            else model_text(original)
+        )
+        result = normalize_translation(original, answer)
     except ValueError:
         if not terms:
             raise
@@ -555,12 +564,12 @@ def translate(original):
     if not reasons_supported(original, result):
         pieces = SENTENCE_BREAK.split(original)
         if len(pieces) > 1:
-            return " ".join(translate(p) for p in pieces)
+            return " ".join(translate(p, guided=guided) for p in pieces)
         raise ValueError("Çevirideki gerekçe kaynak cümleyle uyuşmuyor")
     return result
 
 
-def press_translation(original, language):
+def press_translation(original, language, *, guided=False):
     language = language.split("-")[0]
     if language == "und":
         try:
@@ -570,11 +579,13 @@ def press_translation(original, language):
     if language == "tr":
         return original
     if language == "en":
-        result = translate(original)
+        result = translate(original, guided=guided)
         if not safe_instruction(original, result):
             raise ValueError("Talimatın anlamı doğrulanamadı")
     else:
-        result = model_text(original, source_lang=language)
+        result = model_text(
+            original, source_lang=language, explicit_terms=guided, literal=guided
+        )
     # Latin identifiers can directly touch Japanese or Chinese characters.
     tokens = r"(?<![A-Za-z0-9_])(?:CVE-\d{4}-\d+|[0-9]+(?:\.[0-9]+)+|[a-z][a-z0-9]*_[a-z0-9_]+|VACUUM|REINDEX|WAL|SQL|PostgreSQL)(?![A-Za-z0-9_])"
     if re.findall(tokens, original) != re.findall(tokens, result):
@@ -613,7 +624,13 @@ def pending_count(con):
     done = {
         r[0] for r in con.execute("SELECT original FROM texts WHERE translation <> ''")
     }
-    return len(originals - done - EDITORIAL.keys())
+    fallback = {
+        r[0]
+        for r in con.execute(
+            "SELECT ref FROM translation_tasks WHERE kind='official' AND status='original'"
+        )
+    }
+    return len(originals - done - fallback - EDITORIAL.keys())
 
 
 def safe_instruction(source, target):
@@ -662,48 +679,60 @@ def safe_instruction(source, target):
     return True
 
 
+def translate_round():
+    with db() as con:
+        items = [json.loads(r[0]) for r in con.execute("SELECT data FROM items")]
+        done = {
+            r[0]
+            for r in con.execute("SELECT original FROM texts WHERE translation<>''")
+        } | EDITORIAL.keys()
+        done.update(
+            r[0]
+            for r in con.execute(
+                "SELECT ref FROM translation_tasks WHERE kind='official' AND (status='original' OR due>?)",
+                (int(time.time()),),
+            )
+        )
+    ordered = sorted(items, key=priority)
+    head = []
+    for kind in ("release", "security", "dev", "extension"):
+        head.extend([i for i in ordered if i["kind"] == kind][:5])
+    phrases = dict.fromkeys(s for i in head for s in list(text_fields(i))[:2])
+    phrases.update(dict.fromkeys(s for i in ordered for s in text_fields(i)))
+
+    for phrase in phrases:
+        if phrase in done:
+            continue
+
+        def produce(attempt):
+            result = translate(phrase, guided=attempt > 1)
+            if not safe_instruction(phrase, result):
+                raise ValueError("Sürüm sırası veya talimatın anlamı doğrulanamadı")
+            return result
+
+        status = tasks.run(
+            db,
+            "official",
+            phrase,
+            0,
+            produce,
+            lambda con, value: con.execute(
+                "INSERT OR REPLACE INTO texts VALUES(?,?)", (phrase, value)
+            ),
+            health=lambda: tasks.available(MODEL),
+            seconds=3600,
+        )
+        if status == "offline" or work.is_set():
+            break
+
+
 def translate_pending():
-    retry = {}
     while True:
         work.clear()
-        with db() as con:
-            items = [json.loads(r[0]) for r in con.execute("SELECT data FROM items")]
-            done = {
-                r[0]
-                for r in con.execute("SELECT original FROM texts WHERE translation<>''")
-            } | EDITORIAL.keys()
-        ordered = sorted(items, key=priority)
-        # Translate visible headlines before long update notes and the older archive.
-        head = []
-        for kind in ("release", "security", "dev", "extension"):
-            head.extend([i for i in ordered if i["kind"] == kind][:5])
-        phrases = dict.fromkeys(s for i in head for s in list(text_fields(i))[:2])
-        phrases.update(dict.fromkeys(s for i in ordered for s in text_fields(i)))
-        for s in phrases:
-            if s in done or retry.get(s, 0) > time.monotonic():
-                continue
-            try:
-                translated = translate(s)
-                if not safe_instruction(s, translated):
-                    raise ValueError("Sürüm sırası veya talimatın anlamı doğrulanamadı")
-                with db() as con:
-                    con.execute(
-                        "INSERT OR REPLACE INTO texts VALUES(?,?)", (s, translated)
-                    )
-            except ValueError as exc:
-                state("translation_error", {"time": now(), "message": str(exc)})
-                retry[s] = time.monotonic() + 3600
-                with db() as con:
-                    con.execute("INSERT OR IGNORE INTO texts VALUES(?, '')", (s,))
-            except Exception as exc:
-                state(
-                    "translation_error",
-                    {"time": now(), "message": "Yerel çeviri servisi yanıt vermedi."},
-                )
-                logging.warning("Çeviri servisi bekleniyor: %s", exc)
-                break
-            if work.is_set():
-                break
+        try:
+            translate_round()
+        except Exception:
+            logging.exception("Resmî haberlerin çeviri kuyruğu okunamadı")
         work.wait(30)
 
 
@@ -720,11 +749,18 @@ def bulletin():
         sources = {r["name"]: dict(r) for r in con.execute("SELECT * FROM sources")}
         tr = dict(con.execute("SELECT original,translation FROM texts"))
         tr.update(EDITORIAL)
+        fallback = {
+            r[0]
+            for r in con.execute(
+                "SELECT ref FROM translation_tasks WHERE kind='official' AND status='original'"
+            )
+        }
         items = []
         for row in con.execute("SELECT * FROM items ORDER BY id"):
             item = json.loads(row["data"])
             item.update(seq=row["seq"], observed=row["observed"], source=row["source"])
             item["tr"] = {s: tr[s] for s in text_fields(item) if s in tr}
+            item["original_only"] = [s for s in text_fields(item) if s in fallback]
             items.append(item)
     response = jsonify(
         items=items,
@@ -792,7 +828,14 @@ if __name__ == "__main__":
     workers.extend(
         [
             lambda: community.weekly(db),
-            lambda: community.translations(db, press_translation),
+            lambda: community.translations(
+                db,
+                press_translation,
+                retry_translate=lambda source, language: press_translation(
+                    source, language, guided=True
+                ),
+                health=lambda: tasks.available(MODEL),
+            ),
         ]
     )
     if os.getenv("GUNDEM_CONTAINER") == "1":

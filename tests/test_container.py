@@ -44,7 +44,9 @@ class AuthTests(unittest.TestCase):
             with patch.dict(
                 os.environ, {"GUNDEM_CONTROL": temp, "GUNDEM_ADMIN": str(base / "auth")}
             ):
-                register(web, base, "http://127.0.0.1", None, None)
+                with patch.object(app, "DATA", base):
+                    app.initialize()
+                register(web, base, "http://127.0.0.1", app.db, app.pending_count)
             client = web.test_client()
 
             def post(path, body, token=""):
@@ -55,6 +57,7 @@ class AuthTests(unittest.TestCase):
                     base_url="https://localhost",
                 )
 
+            self.assertEqual(post("retry-translations", {}).status_code, 401)
             self.assertEqual(post("apply", {}).status_code, 401)
             token = client.get("/api/admin/session", base_url="https://localhost").json[
                 "csrf"
@@ -68,6 +71,25 @@ class AuthTests(unittest.TestCase):
             self.assertEqual(
                 post("apply", {"version": "v9.9.9"}, token).status_code, 409
             )
+            self.assertEqual(post("retry-translations", {}).status_code, 403)
+            with patch.object(app, "DATA", base):
+                with app.db() as con:
+                    con.execute(
+                        "INSERT INTO translation_tasks VALUES('press','1',0,3,'original',0,'')"
+                    )
+                    con.execute(
+                        "INSERT INTO translation_tasks VALUES('press','1',1,1,'working',9999999999,'')"
+                    )
+                self.assertEqual(
+                    post("retry-translations", {}, token).json, {"requeued": 1}
+                )
+                with app.db() as con:
+                    self.assertEqual(
+                        con.execute("SELECT status FROM translation_tasks").fetchone()[
+                            0
+                        ],
+                        "working",
+                    )
             for _ in range(2):
                 self.assertEqual(
                     post("apply", {"version": "v1.2.0"}, token).status_code, 202

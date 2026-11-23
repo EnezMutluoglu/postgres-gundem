@@ -6,6 +6,7 @@
 !archive.py
 !feeds.py
 !community.py
+!translation_jobs.py
 !news_search.py
 !templates/
 !templates/**

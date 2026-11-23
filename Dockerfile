@@ -14,7 +14,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY --from=build /engine /engine
 COPY --from=cli /usr/local/bin/docker /usr/local/bin/docker
 COPY --from=cli /usr/local/libexec/docker/cli-plugins/docker-compose /usr/local/libexec/docker/cli-plugins/docker-compose
-COPY app.py feeds.py community.py news_search.py admin.py archive.py turkish.json VERSION LICENSE ./
+COPY app.py feeds.py community.py translation_jobs.py news_search.py admin.py archive.py turkish.json VERSION LICENSE ./
 COPY static ./static
 COPY templates ./templates
 COPY container ./container

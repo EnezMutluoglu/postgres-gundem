@@ -11,6 +11,8 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 from xml.etree import ElementTree as ET
 
+import translation_jobs as tasks
+
 from bs4 import BeautifulSoup
 from flask import jsonify, request
 from langdetect import LangDetectException, detect_langs
@@ -514,12 +516,14 @@ def weekly(db):
         time.sleep(300)
 
 
-def translate_fragment(db, translate, ts):
+def translate_fragment(db, translate, ts, retry_translate, health):
     with db() as con:
         part = con.execute(
             """SELECT p.revision,p.pos,substr(r.original,p.pos+1,p.length) AS source,r.lang
-          FROM press_parts p JOIN press_revisions r ON r.id=p.revision WHERE p.translation IS NULL AND p.retry<=?
-          ORDER BY p.retry,p.revision,p.pos LIMIT 1""",
+          FROM press_parts p JOIN press_revisions r ON r.id=p.revision
+          LEFT JOIN translation_tasks j ON j.kind='body' AND j.ref=CAST(p.revision AS TEXT) AND j.part=p.pos
+          WHERE p.translation IS NULL AND (j.status IS NULL OR (j.status!='original' AND j.due<=?))
+          ORDER BY p.revision,p.pos LIMIT 1""",
             (ts,),
         ).fetchone()
         if not part:
@@ -543,61 +547,63 @@ def translate_fragment(db, translate, ts):
                 pos += len(chunk)
             con.execute("INSERT OR IGNORE INTO press_chunked VALUES(?)", (row["id"],))
             return True
-    try:
-        result = (
-            translate(part["source"].strip(), part["lang"])
-            if part["source"].strip()
+    source = part["source"].strip()
+    return tasks.run(
+        db,
+        "body",
+        part["revision"],
+        part["pos"],
+        lambda attempt: (
+            (retry_translate if attempt > 1 and retry_translate else translate)(
+                source, part["lang"]
+            )
+            if source
             else ""
-        )
-        with db() as con:
-            con.execute(
-                "UPDATE press_parts SET translation=? WHERE revision=? AND pos=?",
-                (result, part["revision"], part["pos"]),
-            )
-    except Exception as exc:
-        with db() as con:
-            con.execute(
-                "UPDATE press_parts SET retry=? WHERE revision=? AND pos=?",
-                (ts + 3600, part["revision"], part["pos"]),
-            )
-        if not isinstance(exc, ValueError):
-            time.sleep(20)
-    return True
+        ),
+        lambda con, value: con.execute(
+            "UPDATE press_parts SET translation=? WHERE revision=? AND pos=?",
+            (value, part["revision"], part["pos"]),
+        ),
+        health=health,
+    )
 
 
-def translate_one(db, translate):
+def translate_one(db, translate, *, retry_translate=None, health=None):
     ts = int(time.time())
     with db() as con:
         row = con.execute(
-            """SELECT r.* FROM press_revisions r JOIN press_articles a ON a.id=r.article
-           WHERE r.title_tr IS NULL AND r.retry<=? ORDER BY (a.current_revision=r.id) DESC,r.published DESC,r.id LIMIT 1""",
+            """SELECT r.*, f.part FROM press_revisions r JOIN press_articles a ON a.id=r.article
+            CROSS JOIN (SELECT 0 AS part UNION ALL SELECT 1) f
+            LEFT JOIN translation_tasks j ON j.kind='press' AND j.ref=CAST(r.id AS TEXT) AND j.part=f.part
+            WHERE ((f.part=0 AND r.title_tr IS NULL) OR (f.part=1 AND r.excerpt!='' AND r.excerpt_tr IS NULL))
+            AND (j.status IS NULL OR (j.status!='original' AND j.due<=?))
+            ORDER BY (a.current_revision=r.id) DESC,r.published DESC,r.id,f.part LIMIT 1""",
             (ts,),
         ).fetchone()
     if not row:
-        return translate_fragment(db, translate, ts)
-    try:
-        title = translate(row["title"], row["lang"])
-        summary = translate(row["excerpt"], row["lang"]) if row["excerpt"] else ""
-        with db() as con:
-            con.execute(
-                "UPDATE press_revisions SET title_tr=?, excerpt_tr=?, error=NULL WHERE id=?",
-                (title, summary, row["id"]),
-            )
-    except Exception as exc:
-        with db() as con:
-            con.execute(
-                "UPDATE press_revisions SET retry=?,error=? WHERE id=?",
-                (ts + 3600, str(exc)[:160], row["id"]),
-            )
-        if not isinstance(exc, ValueError):
-            time.sleep(20)
-    return True
+        return translate_fragment(db, translate, ts, retry_translate, health)
+    field = "title" if row["part"] == 0 else "excerpt"
+    return tasks.run(
+        db,
+        "press",
+        row["id"],
+        row["part"],
+        lambda attempt: (
+            retry_translate if attempt > 1 and retry_translate else translate
+        )(row[field], row["lang"]),
+        lambda con, value: con.execute(
+            f"UPDATE press_revisions SET {field}_tr=?, error=NULL WHERE id=?",
+            (value, row["id"]),
+        ),
+        health=health,
+    )
 
 
-def translations(db, translate):
+def translations(db, translate, **options):
     while True:
         try:
-            if translate_one(db, translate):
+            status = translate_one(db, translate, **options)
+            if status and status != "offline":
                 continue
         except Exception:
             logging.exception("Dış basın çevirisi kesildi")
@@ -628,6 +634,7 @@ def register(app, db):
             ]
             rows = con.execute(
                 """SELECT a.id,a.url,a.host,r.id AS revision,r.lang,r.title,r.title_tr,r.excerpt,r.excerpt_tr,r.published,r.observed,r.error,r.origin
+                ,EXISTS(SELECT 1 FROM translation_tasks j WHERE j.kind='press' AND j.ref=CAST(r.id AS TEXT) AND j.status='original') AS original_only
                 ,(SELECT count(*) FROM press_revisions v WHERE v.article=a.id) AS versions
                 """
                 + joined

@@ -122,7 +122,7 @@ function summary(i) {
     return i.count != null
       ? i.count + " güvenlik açığı için düzeltmeler yayımlandı."
       : "Bu sürümün değişikliklerini ve geçiş notlarını inceleyin.";
-  return i.summary ? "Türkçe açıklama hazırlanıyor." : "";
+  return i.summary || "";
 }
 function featured() {
   return sorted("release")[0];
@@ -356,13 +356,11 @@ function translated(i, s) {
       esc(i.tr[s]) + (["security", "release"].includes(i.kind) ? original : "")
     );
   }
+  const label = i.original_only?.includes(s)
+    ? "Türkçe çeviri doğrulanamadı. Özgün metin (İngilizce)"
+    : "Özgün metin (İngilizce)";
   return (
-    '<span class="muted">' +
-    (Object.hasOwn(i.tr, s)
-      ? "Çeviri teknik doğrulamadan geçemedi."
-      : "Türkçe çeviri hazırlanıyor.") +
-    "</span>" +
-    original
+    '<span class="muted">' + label + '</span><p lang="en">' + esc(s) + "</p>"
   );
 }
 function show(content) {

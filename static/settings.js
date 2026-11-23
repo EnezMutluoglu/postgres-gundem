@@ -52,7 +52,8 @@ async function refresh() {
     ["SQLite", s.database ? "Hazır" : "Hata"],
     ["Yerel model", s.model ? "Hazır" : "Yanıt bekleniyor"],
     ["Son başarılı tarama", date(s.last_scan)],
-    ["Çeviri bekleyen metin", s.pending],
+    ["Resmî bültende çeviri bekleyen metin", s.pending],
+    ["Özgün dilinde bırakılan bölüm", s.original_only],
     [
       "Son çeviri hatası",
       s.translation_error
@@ -73,6 +74,7 @@ async function refresh() {
     ["Son denetim", date(r.checked)],
     ["İşlem", r.message],
   ]);
+  el("retry-translations").hidden = !s.original_only;
   el("notes").textContent = r.notes || "";
   available = r.available || "";
   el("apply").hidden = !available || r.busy;
@@ -103,6 +105,20 @@ el("logout").onclick = () =>
   api("logout", {})
     .then(() => location.reload())
     .catch(report);
+el("retry-translations").onclick = async () => {
+  const button = el("retry-translations");
+  button.disabled = true;
+  try {
+    const result = await api("retry-translations", {});
+    el("feedback").textContent =
+      result.requeued + " bölüm yeniden çeviri sırasına alındı.";
+    await refresh();
+  } catch (err) {
+    report(err);
+  } finally {
+    button.disabled = false;
+  }
+};
 for (const action of ["check", "apply"])
   el(action).onclick = async () => {
     const button = el(action);

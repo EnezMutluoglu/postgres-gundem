@@ -49,18 +49,22 @@ function article(row) {
   const title = node("h2", row.title_tr || row.title);
   if (!row.title_tr) title.lang = row.lang;
   item.append(title);
-  if (row.excerpt_tr) item.append(node("p", row.excerpt_tr));
+  if (row.excerpt_tr || row.excerpt) {
+    const excerpt = node("p", row.excerpt_tr || row.excerpt);
+    excerpt.lang = row.excerpt_tr ? "tr" : row.lang;
+    item.append(excerpt);
+  }
   if (!row.title_tr || (row.excerpt && !row.excerpt_tr))
     item.append(
       node(
         "p",
-        row.error
-          ? "Çeviri doğrulanamadı. Yeniden denenecek."
-          : "Yerel Türkçe çeviri sırada.",
+        row.original_only
+          ? "Türkçesi doğrulanamayan bölüm özgün dilinde gösteriliyor."
+          : "Özgün dil · " + language(row.lang),
         "byline",
       ),
     );
-  if (!row.lang.startsWith("tr")) {
+  if ((row.title_tr || row.excerpt_tr) && !row.lang.startsWith("tr")) {
     const details = node("details");
     details.append(node("summary", "Özgün başlık ve özet"));
     const original = node("p", row.title);

@@ -120,7 +120,7 @@ elif [[ "$(cat "$root/llama/release" 2>/dev/null || true)" != "$release" ]] || !
   printf '%s\n' "$release" >"$root/llama/release"
 fi
 
-install -m 644 app.py admin.py feeds.py community.py news_search.py archive.py turkish.json requirements.txt VERSION "$root/"
+install -m 644 app.py admin.py feeds.py community.py translation_jobs.py news_search.py archive.py turkish.json requirements.txt VERSION "$root/"
 install -d -m 755 "$root/templates"
 install -m 644 templates/*.html "$root/templates/"
 if [[ -f deploy/tunel-koprusu.sh ]]; then install -m 755 deploy/tunel-koprusu.sh "$root/tunel-koprusu.sh"; fi

@@ -20,7 +20,8 @@
           />Postgres Gündem</a
         >
         <nav aria-label="Ana menü">
-          <a href="/">Bülten</a><a href="/dis-basin">Dış basın</a><a class="active" href="/ayarlar">Ayarlar</a>
+          <a href="/">Bülten</a><a href="/dis-basin">Dış basın</a
+          ><a class="active" href="/ayarlar">Ayarlar</a>
         </nav>
       </div>
     </header>
@@ -42,6 +43,9 @@
         <section class="card">
           <h2>Sistem durumu</h2>
           <dl id="health-list"></dl>
+          <button hidden id="retry-translations">
+            Çevirileri yeniden dene
+          </button>
         </section>
         <section class="card">
           <h2>Güncellemeler</h2>
