@@ -1,0 +1,24 @@
+[Unit]
+Description=Postgres Gündem haber paneli
+After=network-online.target
+Wants=network-online.target postgres-gundem-model.service
+
+[Service]
+Type=simple
+DynamicUser=yes
+StateDirectory=postgres-gundem
+WorkingDirectory=/opt/postgres-gundem
+Environment=GUNDEM_DATA=/var/lib/postgres-gundem
+Environment=GUNDEM_MODEL_TIMEOUT=1200
+Environment=PYTHONUTF8=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/postgres-gundem/venv/bin/python /opt/postgres-gundem/app.py
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,7 @@
+<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ayarlar · Postgres Gündem</title><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/settings.css"><script defer src="/static/settings.js"></script></head><body>
+<header class="mast"><div class="shell mast-inner"><a class="brand" href="/"><img src="/static/elephant.png" width="37" height="38" alt="">Postgres Gündem</a><nav aria-label="Ana menü"><a href="/">Bülten</a><a class="active" href="/ayarlar">Ayarlar</a></nav></div></header>
+<main class="shell settings"><h1>Ayarlar</h1><p id="feedback" role="status" aria-live="polite"></p>
+<form id="login" class="card" hidden><h2>Yönetici girişi</h2><label for="password">Yönetici parolası</label><input id="password" type="password" autocomplete="current-password" required maxlength="512"><button>Giriş yap</button></form>
+<div id="dashboard" hidden><section class="card"><h2>Sistem durumu</h2><dl id="health-list"></dl></section>
+<section class="card"><h2>Güncellemeler</h2><dl id="release-list"></dl><p id="notes"></p><div class="actions"><button id="check">Şimdi denetle</button><button id="apply" hidden>Güncelle</button></div></section>
+<button id="logout">Oturumu kapat</button></div></main></body></html>

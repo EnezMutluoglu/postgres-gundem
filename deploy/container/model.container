@@ -1,0 +1,25 @@
+[Unit]
+Description=Postgres Gündem yerel çeviri
+[Container]
+Image=@PG_IMAGE@
+Pull=never
+ContainerName=postgres-gundem-model
+@USERNS@
+Network=postgres-gundem-private:alias=model
+Exec=/bin/sh /app/container/model-start.sh
+Environment=MODEL_FILE=@MODEL_FILE@
+Volume=@PG_ROOT@/models:/models:ro,z
+ReadOnly=true
+NoNewPrivileges=true
+DropCapability=ALL
+HealthCmd=python /app/container/probe.py model
+HealthInterval=30s
+HealthRetries=3
+HealthStartPeriod=180s
+PodmanArgs=--memory=3200m --cpus=2
+[Service]
+Restart=always
+TimeoutStartSec=300
+[Install]
+WantedBy=default.target
+

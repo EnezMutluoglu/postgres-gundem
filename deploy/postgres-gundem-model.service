@@ -1,0 +1,19 @@
+[Unit]
+Description=Postgres Gündem yerel Türkçe çeviri modeli
+
+[Service]
+Type=simple
+DynamicUser=yes
+WorkingDirectory=/opt/postgres-gundem
+Environment=LD_LIBRARY_PATH=/opt/postgres-gundem/llama
+ExecStart=/opt/postgres-gundem/llama/llama-server -m /opt/postgres-gundem/models/Riva-Translate-4B-Instruct-v2-Q4_K_M.gguf --host 127.0.0.1 --port 18081 -c 4096 -np 1 --jinja --no-ui
+Restart=on-failure
+RestartSec=10
+Nice=10
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+
+[Install]
+WantedBy=multi-user.target

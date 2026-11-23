@@ -1,0 +1,340 @@
+[
+ [
+  "Take a full backup before applying the maintenance update.",
+  [
+   "bakım güncelleme",
+   "yedek",
+   "önce"
+  ],
+  [
+   "güvenlik",
+   "gerekçe"
+  ]
+ ],
+ [
+  "For security reasons, take a full backup before applying the maintenance update.",
+  [
+   "güvenli",
+   "bakım güncelleme",
+   "yedek"
+  ],
+  []
+ ],
+ [
+  "Do not restart the primary server.",
+  [
+   "birincil sunucu",
+   "başlatma"
+  ],
+  []
+ ],
+ [
+  "Restart the standby server.",
+  [
+   "bekleme sunucu",
+   "başlat"
+  ],
+  []
+ ],
+ [
+  "The primary server writes new WAL records.",
+  [
+   "birincil sunucu",
+   "WAL",
+   "yaz"
+  ],
+  []
+ ],
+ [
+  "The standby server replays WAL records.",
+  [
+   "bekleme sunucu",
+   "WAL"
+  ],
+  []
+ ],
+ [
+  "PostgreSQL 16.3 fixes this issue.",
+  [
+   "PostgreSQL",
+   "16.3",
+   "düzelt|gider"
+  ],
+  []
+ ],
+ [
+  "Versions before 15.7 are affected.",
+  [
+   "15.7",
+   "önce",
+   "etkilen"
+  ],
+  []
+ ],
+ [
+  "Versions from 15.7 onward are unaffected.",
+  [
+   "15.7",
+   "etkilenm"
+  ],
+  []
+ ],
+ [
+  "Upgrade from 14.11 to 14.12.",
+  [
+   "14.11",
+   "14.12",
+   "yükselt|güncelle"
+  ],
+  []
+ ],
+ [
+  "This maintenance release includes bug fixes.",
+  [
+   "bakım sürümü",
+   "hata"
+  ],
+  []
+ ],
+ [
+  "Schedule a maintenance window.",
+  [
+   "bakım pencere"
+  ],
+  []
+ ],
+ [
+  "The security update is available now.",
+  [
+   "güvenlik güncelleme"
+  ],
+  []
+ ],
+ [
+  "Use a full backup to restore the database.",
+  [
+   "yedek",
+   "veritaban|veri taban",
+   "geri yük|geri dön"
+  ],
+  []
+ ],
+ [
+  "The database can remain online.",
+  [
+   "veritaban|veri taban",
+   "çevrimiçi|açık"
+  ],
+  []
+ ],
+ [
+  "A service restart is not required.",
+  [
+   "gerekmez|gerekli değil|gerekm"
+  ],
+  []
+ ],
+ [
+  "A service restart is required.",
+  [
+   "gerek|zorunlu"
+  ],
+  [
+   "gerekmez",
+   "gerekmiyor"
+  ]
+ ],
+ [
+  "Run REINDEX after applying the patch.",
+  [
+   "REINDEX",
+   "sonra"
+  ],
+  []
+ ],
+ [
+  "Do not run VACUUM during recovery.",
+  [
+   "VACUUM",
+   "çalıştırma|yürütme|uygulama"
+  ],
+  []
+ ],
+ [
+  "Logical replication is enabled by default.",
+  [
+   "mantıksal çoğaltma",
+   "varsayılan"
+  ],
+  []
+ ],
+ [
+  "The query planner can use this index.",
+  [
+   "sorgu planlayıcı",
+   "dizin|indeks"
+  ],
+  []
+ ],
+ [
+  "Row-level security applies to this table.",
+  [
+   "satır düzeyinde güvenli",
+   "tablo"
+  ],
+  []
+ ],
+ [
+  "The release candidate is ready for testing.",
+  [
+   "sürüm aday",
+   "test|sına"
+  ],
+  []
+ ],
+ [
+  "The minor release does not change the file format.",
+  [
+   "bakım sürümü",
+   "değiştir[m]|değişme"
+  ],
+  []
+ ],
+ [
+  "The extension adds support for JSON data.",
+  [
+   "eklenti|uzantı",
+   "JSON"
+  ],
+  []
+ ],
+ [
+  "This change affects only read-only transactions.",
+  [
+   "salt okunur|yalnızca okun|sadece okun",
+   "işlem"
+  ],
+  []
+ ],
+ [
+  "The connection pool is full.",
+  [
+   "bağlantı",
+   "havuz",
+   "dolu"
+  ],
+  []
+ ],
+ [
+  "The temporary table is dropped at commit.",
+  [
+   "geçici tablo",
+   "sil|kaldır"
+  ],
+  []
+ ],
+ [
+  "A unique constraint prevents duplicate entries.",
+  [
+   "benzersiz|eşsiz|tekil",
+   "kısıt"
+  ],
+  []
+ ],
+ [
+  "The transaction was rolled back.",
+  [
+   "işlem",
+   "geri al"
+  ],
+  []
+ ],
+ [
+  "A missing index can slow down this query.",
+  [
+   "dizin|indeks",
+   "sorgu",
+   "yavaş"
+  ],
+  []
+ ],
+ [
+  "The release notes include upgrade instructions.",
+  [
+   "sürüm not",
+   "yükselt|güncelle"
+  ],
+  []
+ ],
+ [
+  "Apply the patch to each database.",
+  [
+   "her",
+   "veritaban|veri taban",
+   "yama"
+  ],
+  []
+ ],
+ [
+  "Only PostgreSQL 15.4 is affected.",
+  [
+   "PostgreSQL",
+   "15.4",
+   "etkilen",
+   "yalnız|sadece"
+  ],
+  []
+ ],
+ [
+  "Check the system catalogs before upgrading.",
+  [
+   "sistem katalog",
+   "önce"
+  ],
+  []
+ ],
+ [
+  "The server rejects invalid SQL statements.",
+  [
+   "SQL",
+   "geçersiz",
+   "redd"
+  ],
+  []
+ ],
+ [
+  "Restart the service to reload the configuration.",
+  [
+   "yapılandırma",
+   "yeniden",
+   "için"
+  ],
+  []
+ ],
+ [
+  "This fix prevents data loss.",
+  [
+   "veri kayb",
+   "önle|engelle"
+  ],
+  []
+ ],
+ [
+  "The backup does not include temporary tables.",
+  [
+   "yedek",
+   "geçici tablo",
+   "içermez|içerm|dahil değil|kapsam"
+  ],
+  []
+ ],
+ [
+  "A new WAL segment is created after the checkpoint.",
+  [
+   "WAL",
+   "sonra",
+   "oluştur"
+  ],
+  []
+ ]
+]

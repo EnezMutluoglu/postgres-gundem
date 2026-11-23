@@ -1,0 +1,30 @@
+[Unit]
+Description=Postgres Gündem bülteni
+[Container]
+Image=@PG_IMAGE@
+Pull=never
+ContainerName=postgres-gundem-web
+User=@RUN_UID@:@RUN_GID@
+@USERNS@
+Network=postgres-gundem-origin:alias=postgres-gundem
+Network=postgres-gundem-private
+Environment=GUNDEM_TRANSLATOR=@MODEL_TYPE@
+Volume=@PG_ROOT@/data:/data:z
+Volume=@PG_ROOT@/arsiv:/data/arsiv:z
+Volume=@PG_ROOT@/config:/config:ro,z
+Volume=@PG_ROOT@/requests:/control/requests:z
+Volume=@PG_ROOT@/status:/control/status:ro,z
+ReadOnly=true
+NoNewPrivileges=true
+DropCapability=ALL
+HealthCmd=python /app/container/probe.py web
+HealthInterval=30s
+HealthRetries=3
+HealthStartPeriod=30s
+PodmanArgs=--memory=384m
+[Service]
+Restart=always
+TimeoutStartSec=300
+[Install]
+WantedBy=default.target
+

@@ -1,0 +1,7 @@
+.venv/
+.runtime/
+paket/
+.data/
+__pycache__/
+.ruff_cache/
+*.pyc

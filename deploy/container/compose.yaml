@@ -1,0 +1,52 @@
+name: postgres-gundem
+services:
+  web:
+    image: ${PG_IMAGE:?}
+    pull_policy: never
+    restart: unless-stopped
+    user: "${RUN_UID:-10001}:${RUN_GID:-10001}"
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      GUNDEM_TRANSLATOR: ${MODEL_TYPE:?}
+    volumes:
+      - "${PG_ROOT}/data:/data:z"
+      - "${PG_ROOT}/arsiv:/data/arsiv:z"
+      - "${PG_ROOT}/config:/config:ro,z"
+      - "${PG_ROOT}/requests:/control/requests:z"
+      - "${PG_ROOT}/status:/control/status:ro,z"
+    networks:
+      origin:
+        aliases: [postgres-gundem]
+      private: {}
+    mem_limit: 384m
+  model:
+    image: ${PG_IMAGE:?}
+    pull_policy: never
+    restart: unless-stopped
+    command: ["/bin/sh","/app/container/model-start.sh"]
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=48m"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      MODEL_FILE: ${MODEL_FILE:?}
+    volumes: ["${PG_ROOT}/models:/models:ro,z"]
+    networks: [private]
+    mem_limit: 3200m
+    cpus: 2
+    healthcheck:
+      test: ["CMD","python","/app/container/probe.py","model"]
+      interval: 30s
+      timeout: 5s
+      start_period: 180s
+      retries: 3
+networks:
+  origin:
+    external: true
+    name: postgres-gundem-origin
+  private:
+    internal: true
+

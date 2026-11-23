@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Postgres Gündem · PostgreSQL haber bülteni</title>
+    <meta
+      name="description"
+      content="PostgreSQL güvenlik yamaları, geliştirme notları ve eklenti haberlerini Türkçe takip edin."
+    />
+    <link rel="icon" href="/static/elephant.png" />
+    <link rel="stylesheet" href="/static/app.css" />
+    <script src="/static/app.js" defer></script>
+  </head>
+  <body>
+    <header class="mast">
+      <div class="shell mast-inner">
+        <a class="brand" href="#bulten"
+          ><img src="/static/elephant.png" alt="" width="37" height="38" /><span
+            >Postgres<span class="brand-light">Gündem</span></span
+          ></a
+        >
+        <nav aria-label="Ana menü">
+          <a href="#bulten" class="active" data-nav="bulten">Bülten</a
+          ><a href="#gelistirme" data-nav="gelistirme">Geliştirme</a
+          ><a href="#eklentiler" data-nav="eklentiler">Eklentiler</a>
+          <a href="/ayarlar">Ayarlar</a>
+        </nav>
+        <span id="connection" class="connection"
+          ><i></i><span>Bağlanıyor</span></span
+        >
+      </div>
+    </header>
+    <main class="shell" id="bulten">
+      <div class="page-heading">
+        <div>
+          <div class="dateline" id="today"></div>
+          <h1>Günlük bülten<span>.</span></h1>
+        </div>
+        <button class="refresh" id="refresh">
+          <i data-icon="refresh"></i><span>Yenile</span>
+        </button>
+      </div>
+      <div id="health" role="status" hidden></div>
+      <section id="notice" class="notice" hidden aria-live="polite"></section>
+      <div class="layout">
+        <section id="yamalar" class="main-col">
+          <div class="section-title">
+            <span class="section-icon blue"><i data-icon="shield"></i></span>
+            <h2>Güvenlik ve yamalar</h2>
+          </div>
+          <div id="feature"></div>
+          <section class="card cves">
+            <div class="card-title">
+              <div>
+                <span class="small-rule"></span>
+                <h3>Güvenlik kayıtları</h3>
+              </div>
+              <span id="cve-count" class="counter">0</span>
+            </div>
+            <div class="filters">
+              <label
+                ><i data-icon="layers"></i
+                ><select id="version" aria-label="Ana sürüme göre filtrele">
+                  <option value="">Tüm sürümler</option>
+                </select></label
+              >
+              <label
+                ><i data-icon="sliders"></i
+                ><select
+                  id="severity"
+                  aria-label="Önem derecesine göre filtrele"
+                >
+                  <option value="">Tüm önem düzeyleri</option>
+                  <option>Kritik</option>
+                  <option>Yüksek</option>
+                  <option>Orta</option>
+                  <option>Düşük</option>
+                </select></label
+              >
+            </div>
+            <div id="cve-list"></div>
+            <button class="more" id="more-cves" hidden>
+              Daha fazla kayıt göster <i data-icon="down"></i>
+            </button>
+          </section>
+          <div id="older-releases"></div>
+        </section>
+        <aside>
+          <section id="gelistirme" class="side-section">
+            <div class="section-title">
+              <span class="section-icon teal"><i data-icon="branch"></i></span>
+              <h2>Geliştirme günlüğü</h2>
+            </div>
+            <div class="card">
+              <div id="dev-list"></div>
+              <button class="more" id="all-dev">
+                Geliştirme arşivini aç <i data-icon="book"></i>
+              </button>
+            </div>
+          </section>
+          <section id="eklentiler" class="side-section">
+            <div class="section-title">
+              <span class="section-icon purple"
+                ><i data-icon="puzzle"></i
+              ></span>
+              <h2>Eklentiler</h2>
+            </div>
+            <div class="card">
+              <div id="ext-list"></div>
+              <button class="more" id="all-ext">
+                Eklenti arşivini aç <i data-icon="book"></i>
+              </button>
+            </div>
+          </section>
+        </aside>
+      </div>
+    </main>
+    <footer>
+      <div class="shell footer-inner">
+        <span><strong>Postgres Gündem</strong> · Bağımsız Türkçe bülten</span
+        ><span id="last-check"></span>
+      </div>
+    </footer>
+    <dialog id="reader" aria-labelledby="dialog-title">
+      <div class="dialog-tools">
+        <span class="mini-brand"
+          ><img src="/static/elephant.png" alt="" /> Postgres Gündem</span
+        ><button id="close" class="icon-button" aria-label="Kapat">
+          <i data-icon="x"></i>
+        </button>
+      </div>
+      <div id="dialog-body"></div>
+    </dialog>
+  </body>
+</html>

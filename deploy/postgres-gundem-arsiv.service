@@ -1,0 +1,17 @@
+[Unit]
+Description=Postgres Gündem aylık sıkıştırılmış haber arşivi
+ConditionPathExists=/var/lib/postgres-gundem/gundem.sqlite
+
+[Service]
+Type=oneshot
+User=postgres-gundem
+DynamicUser=yes
+StateDirectory=postgres-gundem
+Environment=TMPDIR=/var/tmp
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 /opt/postgres-gundem/archive.py
+UMask=0077
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+NoNewPrivileges=yes

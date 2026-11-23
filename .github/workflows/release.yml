@@ -1,0 +1,113 @@
+name: Konteyner ve sürüm
+on:
+  push:
+    branches: [main]
+    tags: ['v*.*.*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {arch: amd64, runner: ubuntu-24.04}
+          - {arch: arm64, runner: ubuntu-24.04-arm}
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    env:
+      ARCH: ${{ matrix.arch }}
+      IMAGE: ghcr.io/enezmutluoglu/postgres-gundem
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          provenance: false
+          platforms: linux/${{ matrix.arch }}
+          tags: ghcr.io/enezmutluoglu/postgres-gundem:build-${{ github.sha }}-${{ matrix.arch }}
+          cache-from: type=gha,scope=engine-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=engine-${{ matrix.arch }}
+      - name: Test
+        run: |
+          set -eu
+          image="$IMAGE:build-$GITHUB_SHA-$ARCH"
+          docker run --rm -v "$PWD:/src:ro" -w /src "$image" python -m unittest discover -s tests
+          docker run --rm "$image" /engine/llama-server --version
+          docker run --rm "$image" docker compose version
+      - name: Sürüm imajı
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          set -eu
+          name="$IMAGE:$GITHUB_REF_NAME-$ARCH"
+          docker tag "$IMAGE:build-$GITHUB_SHA-$ARCH" "$name"
+          docker push "$name"
+          mkdir out
+          docker save "$name" | gzip -1 > "out/image-$ARCH.tar.gz"
+          digest=$(docker inspect --format '{{index .RepoDigests 0}}' "$name")
+          id=$(docker inspect --format '{{.Id}}' "$name")
+          jq -n --arg digest "${digest##*@}" --arg id "$id" --arg sha "$(sha256sum "out/image-$ARCH.tar.gz" | cut -d' ' -f1)" --argjson bytes "$(stat -c %s "out/image-$ARCH.tar.gz")" '{digest:$digest,id:$id,sha256:$sha,bytes:$bytes}' > "out/image-$ARCH.json"
+      - uses: actions/upload-artifact@v4
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          name: image-${{ matrix.arch }}
+          path: out/
+          retention-days: 2
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      packages: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      IMAGE: ghcr.io/enezmutluoglu/postgres-gundem
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: image-*
+          merge-multiple: true
+          path: out
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Çok mimarili etiketi ve imzalı bildirimi hazırla
+        env:
+          SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
+        run: |
+          set -eu
+          docker buildx imagetools create -t "$IMAGE:$GITHUB_REF_NAME" "$IMAGE:$GITHUB_REF_NAME-amd64" "$IMAGE:$GITHUB_REF_NAME-arm64"
+          python3 release/make-manifest.py out "$GITHUB_REF_NAME"
+          trap 'rm -f "$RUNNER_TEMP/release.key"' EXIT
+          umask 077
+          printf '%s\n' "$SIGNING_KEY" > "$RUNNER_TEMP/release.key"
+          unset SIGNING_KEY
+          openssl pkeyutl -sign -rawin -inkey "$RUNNER_TEMP/release.key" -in out/release.json -out out/release.sig
+          openssl pkeyutl -verify -rawin -pubin -inkey deploy/container/release.pub -in out/release.json -sigfile out/release.sig
+          cp VERSION deploy/container/
+          tar -czf out/kurulum.tar.gz -C deploy container
+          (cd out && sha256sum kurulum.tar.gz > kurulum.tar.gz.sha256)
+      - name: Kararlı sürümü yayımla
+        run: |
+          gh release create "$GITHUB_REF_NAME" --verify-tag --draft --title "Postgres Gündem $GITHUB_REF_NAME" --notes-file release/notes.txt
+          gh release upload "$GITHUB_REF_NAME" out/release.json out/release.sig out/image-*.tar.gz out/kurulum.tar.gz*
+          gh release edit "$GITHUB_REF_NAME" --draft=false --latest
+
