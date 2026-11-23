@@ -20,10 +20,10 @@ Varsayılan çevirmen TranslateGemma 4B Q4_K_M, 40 DBA cümlesinin 38'inde tekni
 
 Linux ARM64 veya x86-64, Docker Engine ve Compose v2 gerekir. Kurucu sunucudaki Bash, Python 3.9+, OpenSSL 3, curl ve tar araçlarını kullanır. Model sunucunun işlemcisiyle çalışır. Ağırlıkları bellek eşleme ile açar ve bir seferde bir metin çevirir. Model ve SQLite yeni sürümlerde de aynı sunucu klasörlerinde kalır.
 
-**Hetzner sunucusuna doğrudan indirmek için** root terminalinde şu komutu çalıştırın. Kurucu v1.1.3 paketini doğrular, uygun yerel model varsa onu kullanır ve gerekirse modeli sunucuya indirir. İlk kurulumda panel yöneticisi için parola ister. Eski systemd paneli varsa hizmetlerini durdurur. Eski haber arşivi `/var/lib/postgres-gundem` altında kalır. Yeni Docker kurulumunun veri dizini `/srv/postgres-gundem/data` olur.
+**Hetzner sunucusuna doğrudan indirmek için** root terminalinde şu komutu çalıştırın. Kurucu v1.1.3 paketini doğrular, uygun yerel model varsa onu kullanır ve gerekirse modeli sunucuya indirir. İlk kurulumda panel yöneticisi için 6 ile 512 karakter arasında bir parola ister. Eski systemd paneli varsa hizmetlerini durdurur. Eski haber arşivi `/var/lib/postgres-gundem` altında kalır. Yeni Docker kurulumunun veri dizini `/srv/postgres-gundem/data` olur.
 
 ```bash
-curl -fL --retry 3 https://github.com/EnezMutluoglu/postgres-gundem/releases/download/v1.1.3/hetzner-kur-manuel.sh -o /root/postgres-gundem-kur.sh && bash /root/postgres-gundem-kur.sh
+curl -fL --retry 3 https://github.com/EnezMutluoglu/postgres-gundem/releases/download/v1.1.3/hetzner-kur-manuel-2.sh -o /root/postgres-gundem-kur.sh && bash /root/postgres-gundem-kur.sh
 ```
 
 Kurucu aynı Docker sunucusunda çalışan tek bir `cloudflare/cloudflared` bağlayıcısını otomatik seçer ve tünelin ağından paneli sınar. Birden fazla bağlayıcınız veya özel imajınız varsa `CLOUDFLARED_CONTAINER=konteyner-adı bash /root/postgres-gundem-kur.sh` kullanın. Mevcut Cloudflare rotasında **Type** değerini `HTTP`, **URL** değerini `postgres-gundem:8080` yapın. Bağlayıcı Compose ile yeniden oluşturuluyorsa aşağıdaki [Cloudflare Tunnel](#cloudflare-tunnel) ağ ayarını da uygulayın.
@@ -36,10 +36,10 @@ cd /root
 mkdir -p postgres-gundem-kurulum
 cd postgres-gundem-kurulum
 url=https://github.com/EnezMutluoglu/postgres-gundem/releases/download/v1.1.3
-curl -fLO "$url/kurulum-manuel.tar.gz"
-curl -fLO "$url/kurulum-manuel.tar.gz.sha256"
-sha256sum -c kurulum-manuel.tar.gz.sha256
-tar -xzf kurulum-manuel.tar.gz
+curl -fLO "$url/kurulum-manuel-2.tar.gz"
+curl -fLO "$url/kurulum-manuel-2.tar.gz.sha256"
+sha256sum -c kurulum-manuel-2.tar.gz.sha256
+tar -xzf kurulum-manuel-2.tar.gz
 cd container
 bash get-model.sh
 bash install.sh docker
@@ -50,7 +50,7 @@ Modeli başka makinede indirdiyseniz `bash get-model.sh /root/model.gguf` kullan
 Eski Docker kurulumunda saatlik yazılım denetimini kaldırmak için root oturumunda aşağıdaki komutu bir kez çalıştırın. Betik yalnızca güncelleyici konteynerini yeniden başlatır.
 
 ```bash
-curl -fL --retry 3 https://github.com/EnezMutluoglu/postgres-gundem/releases/download/v1.1.3/hetzner-kur-manuel.sh -o /root/postgres-gundem-kur.sh && bash /root/postgres-gundem-kur.sh --sadece-guncelleyici
+curl -fL --retry 3 https://github.com/EnezMutluoglu/postgres-gundem/releases/download/v1.1.3/hetzner-kur-manuel-2.sh -o /root/postgres-gundem-kur.sh && bash /root/postgres-gundem-kur.sh --sadece-guncelleyici
 ```
 
 ### Çalışan Hetzner panelinden geçiş

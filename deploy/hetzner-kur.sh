@@ -13,8 +13,8 @@ dir=/root/postgres-gundem-kurulum/$tag/manuel
 mkdir -p "$dir"
 cd "$dir"
 curl --fail --location --retry 3 --proto '=https' \
-  "https://github.com/EnezMutluoglu/postgres-gundem/releases/download/$tag/kurulum-manuel.tar.gz" -o kurulum.tar.gz
-echo '026094002a2ce6e344c9583db6295623949f1e068b526a5b9b6b673a05c32006  kurulum.tar.gz' | sha256sum -c -
+  "https://github.com/EnezMutluoglu/postgres-gundem/releases/download/$tag/kurulum-manuel-2.tar.gz" -o kurulum.tar.gz
+echo '95eb6d756ce008cd234f6393edd126d04f91abd0f64309f24627bb7fd4be7c0b  kurulum.tar.gz' | sha256sum -c -
 tar -xzf kurulum.tar.gz
 cd container
 
@@ -76,6 +76,10 @@ PY
   fi
   echo 'Panel sürümü artık yönetici isteğiyle denetlenir.'
   if [[ $mode == --sadece-guncelleyici ]]; then exit 0; fi
+  helper=$PG_ROOT/controller/admin-password.py
+  if printf '%s  %s\n' 2cc374024ddcbe2a41c620aa180e253ac2705838f554dd69e61b882faa75ab8a "$helper" | sha256sum -c --status; then
+    install -m 700 admin-password.py "$helper"
+  fi
   docker start postgres-gundem-model-1 postgres-gundem-web-1 postgres-gundem-updater >/dev/null
 else
   if [[ $mode == --sadece-guncelleyici ]]; then echo 'Kurulu Docker paneli bulunamadı. İlk kurulum için betiği parametresiz çalıştırın.' >&2; exit 1; fi

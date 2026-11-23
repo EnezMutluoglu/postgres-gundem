@@ -25,10 +25,10 @@ systemctl show postgres-gundem.service -p FragmentPath -p ActiveState
   mkdir -p /root/postgres-gundem-v1.1.3
   cd /root/postgres-gundem-v1.1.3
   url=https://github.com/EnezMutluoglu/postgres-gundem/releases/download/v1.1.3
-  curl -fLO "$url/kurulum-manuel.tar.gz"
-  curl -fLO "$url/kurulum-manuel.tar.gz.sha256"
-  sha256sum -c kurulum-manuel.tar.gz.sha256
-  tar -xzf kurulum-manuel.tar.gz
+  curl -fLO "$url/kurulum-manuel-2.tar.gz"
+  curl -fLO "$url/kurulum-manuel-2.tar.gz.sha256"
+  sha256sum -c kurulum-manuel-2.tar.gz.sha256
+  tar -xzf kurulum-manuel-2.tar.gz
   bash container/hetzner-gecis.sh /root/docker-v1.0.0/translategemma-4b-it-Q4_K_M.gguf
 )
 ```

@@ -1,6 +1,7 @@
 import importlib.util
 import json
 import os
+import runpy
 import sqlite3
 import subprocess
 import tempfile
@@ -9,7 +10,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from flask import Flask
-from werkzeug.security import generate_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from admin import register
 import app
@@ -24,6 +25,38 @@ def load_controller():
 
 
 class AuthTests(unittest.TestCase):
+    @unittest.skipUnless(os.name == "posix", "Linux kurulum parolası")
+    def test_password_setup_and_reset_accept_six_characters(self):
+        script = (
+            Path(__file__).resolve().parents[1] / "deploy/container/admin-password.py"
+        )
+        with (
+            tempfile.TemporaryDirectory() as temp,
+            patch.dict(os.environ, {"PG_ROOT": temp}),
+        ):
+            base = Path(temp)
+            (base / "config").mkdir()
+            (base / "settings.json").write_text(
+                json.dumps({"uid": os.getuid(), "gid": os.getgid()})
+            )
+            auth = base / "config/admin.json"
+            for password in ("altı6?", "başka6"):
+                with patch("getpass.getpass", side_effect=[password, password]):
+                    runpy.run_path(str(script))
+                self.assertTrue(
+                    check_password_hash(
+                        json.loads(auth.read_text())["password"], password
+                    )
+                )
+            saved = auth.read_bytes()
+            for inputs in (["12345"], ["123456", "654321"], ["x" * 513]):
+                with (
+                    patch("getpass.getpass", side_effect=inputs),
+                    self.assertRaises(SystemExit),
+                ):
+                    runpy.run_path(str(script))
+                self.assertEqual(auth.read_bytes(), saved)
+
     def test_readers_cannot_dispatch_and_admin_is_bound_to_session_csrf_and_release(
         self,
     ):

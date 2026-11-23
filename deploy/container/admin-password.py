@@ -10,9 +10,14 @@ from pathlib import Path
 
 base = Path(os.environ.get("PG_ROOT") or Path(__file__).resolve().parents[1])
 cfg = json.loads((base / "settings.json").read_text())
-pw = getpass.getpass("Yeni yönetici parolası (en az 14 karakter): ")
-if len(pw) < 14 or len(pw) > 512 or pw != getpass.getpass("Parolayı tekrar girin: "):
-    raise SystemExit("Parolalar eşleşmedi veya uzunluk geçersiz.")
+min_length = 6
+pw = getpass.getpass(f"Yeni yönetici parolası (en az {min_length} karakter): ")
+if not min_length <= len(pw) <= 512:
+    raise SystemExit(
+        f"Yönetici parolası {min_length} ile 512 karakter arasında olmalı."
+    )
+if pw != getpass.getpass("Parolayı tekrar girin: "):
+    raise SystemExit("Girilen parolalar eşleşmiyor.")
 salt = secrets.token_hex(16)
 value = hashlib.pbkdf2_hmac("sha256", pw.encode(), salt.encode(), 1000000).hex()
 auth = {
