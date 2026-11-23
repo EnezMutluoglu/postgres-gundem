@@ -53,7 +53,16 @@ async function refresh() {
     ["Yerel model", s.model ? "Hazır" : "Yanıt bekleniyor"],
     ["Son başarılı tarama", date(s.last_scan)],
     ["Resmî bültende çeviri bekleyen metin", s.pending],
-    ["Özgün dilinde bırakılan bölüm", s.original_only],
+    ["Çeviri belleğindeki metin", s.memory_entries],
+    ["Çevirisi sorunlu bölüm", s.original_only],
+    [
+      "Sonraki sorunlu çeviri denemesi",
+      s.next_retry === 0
+        ? "Sıraya alındı"
+        : s.next_retry
+          ? date(s.next_retry * 1000)
+          : "—",
+    ],
     [
       "Son çeviri hatası",
       s.translation_error

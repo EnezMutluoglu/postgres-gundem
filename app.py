@@ -87,6 +87,23 @@ def initialize():
         con.executemany(
             "UPDATE texts SET translation='' WHERE original=? AND translation=?", stale
         )
+        if tasks.import_existing(con, EDITORIAL):
+            for (raw,) in con.execute("SELECT data FROM item_history"):
+                queue_official(con, json.loads(raw))
+        con.executemany(
+            "DELETE FROM translation_memory WHERE language='en' AND original=? AND translation=?",
+            stale,
+        )
+
+
+def queue_official(con, item):
+    for source in set(text_fields(item)) - EDITORIAL.keys():
+        con.execute(
+            """INSERT OR IGNORE INTO translation_tasks(kind,ref,part,attempts,status,due,detail)
+            SELECT 'official',?,0,0,'queued',0,'' WHERE NOT EXISTS
+            (SELECT 1 FROM texts WHERE original=? AND translation<>'')""",
+            (source, source),
+        )
 
 
 def save(source, items):
@@ -104,6 +121,7 @@ def save(source, items):
             seq += 1
             row = (item["id"], source, data, seq, now())
             con.execute("INSERT INTO item_history VALUES(?,?,?,?,?)", row)
+            queue_official(con, item)
             con.execute(
                 "INSERT OR REPLACE INTO items VALUES(?,?,?,?,?)",
                 row,
@@ -627,7 +645,7 @@ def pending_count(con):
     fallback = {
         r[0]
         for r in con.execute(
-            "SELECT ref FROM translation_tasks WHERE kind='official' AND status='original'"
+            "SELECT ref FROM translation_tasks WHERE kind='official' AND status='failed'"
         )
     }
     return len(originals - done - fallback - EDITORIAL.keys())
@@ -686,13 +704,15 @@ def translate_round():
             r[0]
             for r in con.execute("SELECT original FROM texts WHERE translation<>''")
         } | EDITORIAL.keys()
-        done.update(
-            r[0]
-            for r in con.execute(
-                "SELECT ref FROM translation_tasks WHERE kind='official' AND (status='original' OR due>?)",
-                (int(time.time()),),
-            )
-        )
+        ts = int(time.time())
+        backlog = []
+        for source, due in con.execute(
+            "SELECT ref,due FROM translation_tasks WHERE kind='official' ORDER BY due"
+        ):
+            if due > ts:
+                done.add(source)
+            else:
+                backlog.append(source)
     ordered = sorted(items, key=priority)
     head = []
     for kind in ("release", "security", "dev", "extension"):
@@ -700,6 +720,7 @@ def translate_round():
     phrases = dict.fromkeys(s for i in head for s in list(text_fields(i))[:2])
     phrases.update(dict.fromkeys(s for i in ordered for s in text_fields(i)))
 
+    phrases.update(dict.fromkeys(backlog))
     for phrase in phrases:
         if phrase in done:
             continue
@@ -715,6 +736,8 @@ def translate_round():
             "official",
             phrase,
             0,
+            phrase,
+            "en",
             produce,
             lambda con, value: con.execute(
                 "INSERT OR REPLACE INTO texts VALUES(?,?)", (phrase, value)
@@ -752,7 +775,7 @@ def bulletin():
         fallback = {
             r[0]
             for r in con.execute(
-                "SELECT ref FROM translation_tasks WHERE kind='official' AND status='original'"
+                "SELECT ref FROM translation_tasks WHERE kind='official' AND status='failed'"
             )
         }
         items = []

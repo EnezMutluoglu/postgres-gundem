@@ -75,20 +75,23 @@ class AuthTests(unittest.TestCase):
             with patch.object(app, "DATA", base):
                 with app.db() as con:
                     con.execute(
-                        "INSERT INTO translation_tasks VALUES('press','1',0,3,'original',0,'')"
+                        "INSERT INTO translation_tasks VALUES('press','1',0,3,'failed',100,'',1)"
                     )
                     con.execute(
-                        "INSERT INTO translation_tasks VALUES('press','1',1,1,'working',9999999999,'')"
+                        "INSERT INTO translation_tasks VALUES('press','1',1,1,'working',9999999999,'',1)"
                     )
                 self.assertEqual(
                     post("retry-translations", {}, token).json, {"requeued": 1}
                 )
                 with app.db() as con:
                     self.assertEqual(
-                        con.execute("SELECT status FROM translation_tasks").fetchone()[
-                            0
+                        [
+                            tuple(row)
+                            for row in con.execute(
+                                "SELECT status,due FROM translation_tasks ORDER BY part"
+                            )
                         ],
-                        "working",
+                        [("failed", 0), ("working", 9999999999)],
                     )
             for _ in range(2):
                 self.assertEqual(

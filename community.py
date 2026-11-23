@@ -522,7 +522,7 @@ def translate_fragment(db, translate, ts, retry_translate, health):
             """SELECT p.revision,p.pos,substr(r.original,p.pos+1,p.length) AS source,r.lang
           FROM press_parts p JOIN press_revisions r ON r.id=p.revision
           LEFT JOIN translation_tasks j ON j.kind='body' AND j.ref=CAST(p.revision AS TEXT) AND j.part=p.pos
-          WHERE p.translation IS NULL AND (j.status IS NULL OR (j.status!='original' AND j.due<=?))
+          WHERE p.translation IS NULL AND (j.status IS NULL OR j.due<=?)
           ORDER BY p.revision,p.pos LIMIT 1""",
             (ts,),
         ).fetchone()
@@ -553,6 +553,8 @@ def translate_fragment(db, translate, ts, retry_translate, health):
         "body",
         part["revision"],
         part["pos"],
+        source,
+        part["lang"],
         lambda attempt: (
             (retry_translate if attempt > 1 and retry_translate else translate)(
                 source, part["lang"]
@@ -576,7 +578,7 @@ def translate_one(db, translate, *, retry_translate=None, health=None):
             CROSS JOIN (SELECT 0 AS part UNION ALL SELECT 1) f
             LEFT JOIN translation_tasks j ON j.kind='press' AND j.ref=CAST(r.id AS TEXT) AND j.part=f.part
             WHERE ((f.part=0 AND r.title_tr IS NULL) OR (f.part=1 AND r.excerpt!='' AND r.excerpt_tr IS NULL))
-            AND (j.status IS NULL OR (j.status!='original' AND j.due<=?))
+            AND (j.status IS NULL OR j.due<=?)
             ORDER BY (a.current_revision=r.id) DESC,r.published DESC,r.id,f.part LIMIT 1""",
             (ts,),
         ).fetchone()
@@ -588,6 +590,8 @@ def translate_one(db, translate, *, retry_translate=None, health=None):
         "press",
         row["id"],
         row["part"],
+        row[field],
+        row["lang"],
         lambda attempt: (
             retry_translate if attempt > 1 and retry_translate else translate
         )(row[field], row["lang"]),
@@ -634,7 +638,7 @@ def register(app, db):
             ]
             rows = con.execute(
                 """SELECT a.id,a.url,a.host,r.id AS revision,r.lang,r.title,r.title_tr,r.excerpt,r.excerpt_tr,r.published,r.observed,r.error,r.origin
-                ,EXISTS(SELECT 1 FROM translation_tasks j WHERE j.kind='press' AND j.ref=CAST(r.id AS TEXT) AND j.status='original') AS original_only
+                ,EXISTS(SELECT 1 FROM translation_tasks j WHERE j.kind='press' AND j.ref=CAST(r.id AS TEXT) AND j.status='failed') AS original_only
                 ,(SELECT count(*) FROM press_revisions v WHERE v.article=a.id) AS versions
                 """
                 + joined

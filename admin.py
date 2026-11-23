@@ -130,12 +130,15 @@ def register(web, data, model, database, pending_count):
                     "SELECT value FROM state WHERE key='translation_error'"
                 ).fetchone()
                 queue = pending_count(con)
-                fallback = con.execute(
-                    "SELECT count(*) FROM translation_tasks WHERE status='original'"
+                memory_entries = con.execute(
+                    "SELECT count(*) FROM translation_memory"
                 ).fetchone()[0]
+                fallback, next_retry = con.execute(
+                    "SELECT count(*),min(due) FROM translation_tasks WHERE status='failed'"
+                ).fetchone()
         except (OSError, sqlite3.Error, ValueError):
             database_ok = False
-            last = err = queue = fallback = None
+            last = err = queue = fallback = next_retry = memory_entries = None
         archives = sorted((data / "arsiv").glob("gundem-????-??.sqlite.gz"))
         return jsonify(
             version=version,
@@ -144,6 +147,8 @@ def register(web, data, model, database, pending_count):
             last_scan=last,
             pending=queue,
             original_only=fallback,
+            next_retry=next_retry,
+            memory_entries=memory_entries,
             translation_error=json.loads(err[0]) if err else None,
             archive=archives[-1].name if archives else None,
             free=shutil.disk_usage(data).free,
@@ -155,7 +160,7 @@ def register(web, data, model, database, pending_count):
         verify()
         with database() as con:
             count = con.execute(
-                "DELETE FROM translation_tasks WHERE status='original'"
+                "UPDATE translation_tasks SET due=0 WHERE status='failed' AND due<>0"
             ).rowcount
         return jsonify(requeued=count)
 

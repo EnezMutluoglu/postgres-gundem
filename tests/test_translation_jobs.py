@@ -1,4 +1,6 @@
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
@@ -49,11 +51,11 @@ class TranslationQueueTests(unittest.TestCase):
                         "SELECT attempts,status FROM translation_tasks"
                     ).fetchone()
                 ),
-                (3, "original"),
+                (3, "failed"),
             )
 
     def test_model_outage_and_interrupted_last_attempt(self):
-        key = (app.db, "official", "Metin", 0)
+        key = (app.db, "official", "Metin", 0, "Metin", "en")
         commit = Mock()
         fail = Mock(side_effect=ConnectionRefusedError())
         for _ in range(4):
@@ -112,7 +114,7 @@ class TranslationQueueTests(unittest.TestCase):
             self.assertEqual(tuple(entry), ("Veritabanı haberi", None))
             self.assertEqual(
                 {r[0] for r in con.execute("SELECT status FROM translation_tasks")},
-                {"original"},
+                {"failed"},
             )
             self.assertTrue(
                 con.execute(
@@ -125,3 +127,144 @@ class TranslationQueueTests(unittest.TestCase):
             (article["original_only"], article["excerpt"]), (1, "Short summary")
         )
         self.assertIn(b"End of article", client.get("/arsiv/oku/-1").data)
+
+    def test_weekly_retry_only_when_due_and_success_survives_restart(self):
+        source = "News item for the weekly check."
+        app.save("notes", [dict(kind="dev", title=source, id="weekly")])
+        app.work.clear()
+        ts = 1700000000
+        with patch.object(
+            app, "translate", side_effect=ValueError("Terim doğrulanamadı")
+        ) as model:
+            for delay in (0, *tasks.RETRY_DELAYS):
+                ts += delay
+                with patch("time.time", return_value=ts):
+                    app.translate_round()
+            due = ts + tasks.RECHECK
+            with app.db() as con:
+                row = con.execute(
+                    "SELECT status,attempts,checked_at,due,detail FROM translation_tasks"
+                ).fetchone()
+                self.assertEqual(
+                    tuple(row), ("failed", 3, ts, due, "Terim doğrulanamadı")
+                )
+            app.initialize()
+            with patch("time.time", return_value=due - 1):
+                app.translate_round()
+            self.assertEqual(model.call_count, 3)
+        with (
+            patch("time.time", return_value=due),
+            patch.object(app, "translate", return_value="Haftalık haber.") as model,
+        ):
+            app.translate_round()
+            app.initialize()
+            app.translate_round()
+            model.assert_called_once_with(source, guided=True)
+        with app.db() as con:
+            self.assertFalse(con.execute("SELECT 1 FROM translation_tasks").fetchone())
+            self.assertEqual(
+                tuple(
+                    con.execute(
+                        "SELECT translation,saved_at FROM translation_memory WHERE original=?",
+                        (source,),
+                    ).fetchone()
+                ),
+                ("Haftalık haber.", due),
+            )
+
+    def test_existing_translations_reused_across_articles_and_revisions(self):
+        def put(url, lang, title, summary):
+            with app.db() as con:
+                community.store(
+                    con,
+                    url,
+                    "example.org",
+                    lang,
+                    title,
+                    summary,
+                    summary,
+                    "",
+                    "feed",
+                    1,
+                    1,
+                )
+
+        put("https://example.org/a", "fr", "Titre", "Résumé")
+        with app.db() as con:
+            # Mimic data written before the translation memory existed.
+            con.execute(
+                "UPDATE press_revisions SET title_tr='Başlık', excerpt_tr='Özet'"
+            )
+            con.execute("INSERT INTO texts VALUES('First announcement','İlk duyuru')")
+            con.execute("DELETE FROM state WHERE key='translation_memory_imported'")
+        app.initialize()
+        put("https://example.org/a", "fr", "Titre", "Changement")
+        put("https://example.org/b", "fr", "Titre", "Résumé")
+        put("https://example.org/c", "en-US", "First announcement", "")
+        put("https://example.org/d", "de", "Titre", "")
+        model = Mock(
+            side_effect=lambda source, lang: {
+                ("Changement", "fr"): "Değişiklik",
+                ("Titre", "de"): "Almanca başlık",
+            }[(source, lang)]
+        )
+        while community.translate_one(app.db, model):
+            pass
+        self.assertCountEqual(
+            [c.args for c in model.call_args_list],
+            [("Changement", "fr"), ("Titre", "de")],
+        )
+        app.initialize()
+        self.assertFalse(community.translate_one(app.db, model))
+        with app.db() as con:
+            rows = con.execute(
+                "SELECT title_tr,excerpt_tr FROM press_revisions ORDER BY id"
+            ).fetchall()
+            self.assertEqual(
+                [tuple(r) for r in rows],
+                [
+                    ("Başlık", "Özet"),
+                    ("Başlık", "Değişiklik"),
+                    ("Başlık", "Özet"),
+                    ("İlk duyuru", None),
+                    ("Almanca başlık", None),
+                ],
+            )
+
+    def test_concurrent_identical_text_has_one_model_request(self):
+        start = Barrier(2)
+        model = Mock(return_value="Kalıcı çeviri")
+        commit = Mock()
+
+        def translate(ref):
+            start.wait(timeout=3)
+            return tasks.run(
+                app.db, "press", ref, 0, "Shared text", "en", model, commit
+            )
+
+        with ThreadPoolExecutor(2) as pool:
+            self.assertEqual(list(pool.map(translate, (1, 2))), ["done", "done"])
+        model.assert_called_once_with(1)
+        self.assertEqual(commit.call_count, 2)
+
+    def test_superseded_official_revision_retains_its_translation_job(self):
+        app.save("notes", [dict(kind="dev", id="revised", title="Previous title")])
+        app.save("notes", [dict(kind="dev", id="revised", title="Updated title")])
+        app.initialize()
+        app.work.clear()
+        with patch.object(
+            app,
+            "translate",
+            side_effect=lambda source, guided: {
+                "Previous title": "Önceki başlık",
+                "Updated title": "Yeni başlık",
+            }[source],
+        ) as model:
+            app.translate_round()
+            app.translate_round()
+            self.assertEqual(model.call_count, 2)
+        with app.db() as con:
+            self.assertEqual(
+                dict(con.execute("SELECT original,translation FROM texts")),
+                {"Previous title": "Önceki başlık", "Updated title": "Yeni başlık"},
+            )
