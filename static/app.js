@@ -347,15 +347,22 @@ function official(i) {
   );
 }
 function translated(i, s) {
-  if (i.tr[s]) return esc(i.tr[s]);
+  const original =
+    '<details><summary>Özgün metin (İngilizce)</summary><p lang="en">' +
+    esc(s) +
+    "</p></details>";
+  if (i.tr[s]) {
+    return (
+      esc(i.tr[s]) + (["security", "release"].includes(i.kind) ? original : "")
+    );
+  }
   return (
     '<span class="muted">' +
     (Object.hasOwn(i.tr, s)
       ? "Çeviri teknik doğrulamadan geçemedi."
       : "Türkçe çeviri hazırlanıyor.") +
-    '</span><details><summary>Özgün metin (İngilizce)</summary><p lang="en">' +
-    esc(s) +
-    "</p></details>"
+    "</span>" +
+    original
   );
 }
 function show(content) {

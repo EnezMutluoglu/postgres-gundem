@@ -199,6 +199,14 @@ GLOSSARY = [
     ("query planner", "sorgu planlayıcısı", r"sorgu planlayıcı"),
     ("row-level security", "satır düzeyinde güvenlik", r"satır düzeyinde güvenli[kğ]"),
     ("release candidate", "sürüm adayı", r"sürüm aday"),
+    ("full backup", "tam yedek", r"tam (?:bir )?yede[kğ]"),
+    ("patch", "yama", r"yama"),
+    ("temporary table", "geçici tablo", r"geçici tablo"),
+    ("connection pool", "bağlantı havuzu", r"bağlantı havuz"),
+    ("system catalog", "sistem kataloğu", r"sistem katalog|sistem kataloğ"),
+    ("recovery", "kurtarma", r"kurtar"),
+    ("read-only transaction", "salt okunur işlem", r"salt okunur işlem"),
+    ("release notes", "sürüm notları", r"sürüm not"),
 ]
 
 
@@ -230,7 +238,7 @@ EN_REASON = re.compile(
     r"thereby|therefore|otherwise|in case|as a safeguard|this (?:prevents|allows|ensures)|"
     r"as a .{0,32}?measure|for (?:[\w-]+ ){0,3}(?:reasons?|purposes?)|for \w+ing|"
     r"to (?:avoid|prevent|protect|preserve|ensure|allow|enable|keep|reduce|improve|"
-    r"mitigate|recover|fix|resolve|address|restore|support|maintain)|"
+    r"mitigate|recover|fix|resolve|address|restore|reload|support|maintain)|"
     r"since (?:the|this|it|they))\b|^(?:to \w+[^.!?]*|for [\w -]+),",
     re.IGNORECASE,
 )
@@ -373,15 +381,37 @@ def model_text(original, *, explicit_terms=False, literal=False):
     if os.getenv("GUNDEM_TRANSLATOR") == "gemma":
         glossary = "\n".join(f"{en} = {tr}" for en, tr, _ in glossary_for(original))
         text = original.replace("<start_of_turn>", "").replace("<end_of_turn>", "")
-        instruction = ("Translate the following PostgreSQL text from English into Turkish for a "
-                       "database administrator. Preserve versions, commands, negations and all "
-                       "conditions. Use only reasons explicitly given. Reply with only the translation.")
+        instruction = (
+            "Translate the following PostgreSQL text from English into Turkish for a "
+            "database administrator. Preserve versions, commands, negations and all "
+            "conditions. Use only reasons explicitly given. Reply with only the translation."
+        )
         if glossary:
             instruction += "\nTerminology:\n" + glossary
-        prompt = "<start_of_turn>user\n" + instruction + "\n\nText:\n" + text + "<end_of_turn>\n<start_of_turn>model\n"
-        payload = {"prompt": prompt, "temperature": 0, "n_predict": 640, "stop": ["<end_of_turn>"]}
-        req = Request(MODEL + "/completion", data=json.dumps(payload).encode(),
-                      headers={"Content-Type": "application/json"})
+        if explicit_terms or literal:
+            instruction += (
+                "\nUse the given Turkish terms with natural inflection. "
+                "Translate an imperative as a polite imperative. Translate 'commit' "
+                "in its database sense. Never insert a precaution or purpose."
+            )
+        prompt = (
+            "<start_of_turn>user\n"
+            + instruction
+            + "\n\nText:\n"
+            + text
+            + "<end_of_turn>\n<start_of_turn>model\n"
+        )
+        payload = {
+            "prompt": prompt,
+            "temperature": 0,
+            "n_predict": 640,
+            "stop": ["<end_of_turn>"],
+        }
+        req = Request(
+            MODEL + "/completion",
+            data=json.dumps(payload).encode(),
+            headers={"Content-Type": "application/json"},
+        )
         with urlopen(req, timeout=MODEL_TIMEOUT) as response:
             result = json.load(response)
         answer = result["content"].strip()
@@ -389,8 +419,11 @@ def model_text(original, *, explicit_terms=False, literal=False):
             raise ValueError("Eksik çeviri")
         return answer
     if os.getenv("GUNDEM_TRANSLATOR") == "opus":
-        req = Request(MODEL + "/translate", data=json.dumps({"text": original}).encode(),
-                      headers={"Content-Type": "application/json"})
+        req = Request(
+            MODEL + "/translate",
+            data=json.dumps({"text": original}).encode(),
+            headers={"Content-Type": "application/json"},
+        )
         with urlopen(req, timeout=MODEL_TIMEOUT) as result:
             answer = json.load(result)["text"].strip()
         if not answer or (answer == original and len(original.split()) > 4):
@@ -451,6 +484,11 @@ TECHNICAL = re.compile(
 
 
 def translate(original):
+    upgrade = re.fullmatch(
+        r"Upgrade from (\d+(?:\.\d+)+) to (\d+(?:\.\d+)+)\.", original
+    )
+    if upgrade:
+        return f"{upgrade[1]} sürümünden {upgrade[2]} sürümüne yükseltin."
     if len(original) > 1000:
         pieces = SENTENCE_BREAK.split(original)
         if len(pieces) > 1:
@@ -513,9 +551,14 @@ def priority(item):
 
 
 def pending_count(con):
-    originals = {s for (raw,) in con.execute("SELECT data FROM items")
-                 for s in text_fields(json.loads(raw))}
-    done = {r[0] for r in con.execute("SELECT original FROM texts WHERE translation <> ''")}
+    originals = {
+        s
+        for (raw,) in con.execute("SELECT data FROM items")
+        for s in text_fields(json.loads(raw))
+    }
+    done = {
+        r[0] for r in con.execute("SELECT original FROM texts WHERE translation <> ''")
+    }
     return len(originals - done - EDITORIAL.keys())
 
 
@@ -525,16 +568,36 @@ def safe_instruction(source, target):
     if re.findall(versions, source) != re.findall(versions, target):
         return False
     if re.search(r"\b(?:not|never|unaffected|unnecessary)\b", source, re.I):
-        if not re.search(r"değil|gerekmez|gerekmi|[a-zçğıöşü](?:mayın|meyin|mamalı|memeli|maz|mez|miyor|mıyor|muyor|müyor|mamak|memek|mamaktadır|memektedir)|etkilenme",target,re.I):
+        if not re.search(
+            r"değil|gerekmez|gerekmi|[a-zçğıöşü](?:mayın|meyin|mamalı|memeli|maz|mez|miyor|mıyor|muyor|müyor|mamak|memek|mamaktadır|memektedir)|etkilenme",
+            target,
+            re.I,
+        ):
             return False
-    if re.search(r"\b(?:unaffected|not affected)\b",source,re.I) and not re.search(r"etkilenm",target,re.I):
+    if re.search(r"\b(?:unaffected|not affected)\b", source, re.I) and not re.search(
+        r"etkilenm", target, re.I
+    ):
         return False
-    if re.search(r"\b(?:is|are) affected\b",source,re.I) and re.search(r"etkilenm|etkilenen.*değil",target,re.I):
+    if re.search(r"\bfrom [\d.]+ (?:onward|onwards)\b", source, re.I) and not re.search(
+        r"\b(?:ve (?:daha )?sonra|d[âa]hil|itibaren|başlayarak)", target, re.I
+    ):
         return False
-    if re.search(r"\bcommit(?:ted)?\b",source,re.I) and re.search(r"taahhü|taahhü[tüd]|vaat",target,re.I):
+    if re.search(r"\b(?:is|are) affected\b", source, re.I) and re.search(
+        r"etkilenm|etkilenen.*değil", target, re.I
+    ):
         return False
-    if re.search(r"\b(?:run|apply|restart|upgrade)\b",source,re.I) and not re.search(r"\b(?:not|never|avoid)\b",source,re.I):
-        if re.search(r"(?:çalıştır|uygula|başlat|yükselt)(?:mayın|meyin|mamalı|memeli)",target,re.I):
+    if re.search(r"\bcommit(?:ted)?\b", source, re.I) and re.search(
+        r"taahhü|taahhü[tüd]|vaat", target, re.I
+    ):
+        return False
+    if re.search(r"\b(?:run|apply|restart|upgrade)\b", source, re.I) and not re.search(
+        r"\b(?:not|never|avoid)\b", source, re.I
+    ):
+        if re.search(
+            r"(?:çalıştır|uygula|başlat|yükselt)(?:mayın|meyin|mamalı|memeli)",
+            target,
+            re.I,
+        ):
             return False
     return True
 
@@ -573,7 +636,10 @@ def translate_pending():
                 with db() as con:
                     con.execute("INSERT OR IGNORE INTO texts VALUES(?, '')", (s,))
             except Exception as exc:
-                state("translation_error", {"time": now(), "message": "Yerel çeviri servisi yanıt vermedi."})
+                state(
+                    "translation_error",
+                    {"time": now(), "message": "Yerel çeviri servisi yanıt vermedi."},
+                )
                 logging.warning("Çeviri servisi bekleniyor: %s", exc)
                 break
             if work.is_set():

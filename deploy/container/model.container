@@ -16,7 +16,7 @@ HealthCmd=python /app/container/probe.py model
 HealthInterval=30s
 HealthRetries=3
 HealthStartPeriod=180s
-PodmanArgs=--memory=3200m --cpus=2
+PodmanArgs=--memory=2880m --memory-swap=2880m --cpus=2
 [Service]
 Restart=always
 TimeoutStartSec=300

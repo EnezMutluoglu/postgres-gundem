@@ -35,7 +35,8 @@ services:
       MODEL_FILE: ${MODEL_FILE:?}
     volumes: ["${PG_ROOT}/models:/models:ro,z"]
     networks: [private]
-    mem_limit: 3200m
+    mem_limit: 2880m
+    memswap_limit: 2880m
     cpus: 2
     healthcheck:
       test: ["CMD","python","/app/container/probe.py","model"]

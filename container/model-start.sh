@@ -9,5 +9,5 @@ if [ -x /engine/llama-server-avx2 ]; then
   done
   if [ "$accelerated" = yes ]; then exe=/engine/llama-server-avx2; fi
 fi
-exec "$exe" -m "/models/$MODEL_FILE" --host 0.0.0.0 --port 18081 -c 2048 -np 1 -t 2 -tb 2 -b 96 -ub 48 --no-warmup --no-ui --jinja
+exec "$exe" -m "/models/$MODEL_FILE" --host 0.0.0.0 --port 18081 -c 2048 -np 1 -t 2 -tb 2 -b 96 -ub 48 --load-mode mmap --no-repack --cache-ram 0 --no-warmup --no-ui --jinja
 
