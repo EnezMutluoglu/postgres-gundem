@@ -79,6 +79,15 @@ class AuthTests(unittest.TestCase):
 
 class QualityTests(unittest.TestCase):
     def test_version_direction_and_database_meaning(self):
+        self.assertTrue(
+            app.safe_instruction(
+                "Versions before 15.7 are affected.",
+                "15.7 öncesi sürümler etkilenmektedir.",
+            )
+        )
+        self.assertFalse(
+            app.safe_instruction("The system is unaffected.", "Sistem etkilenmektedir.")
+        )
         for source, target in [
             ("Upgrade from 16.2 to 16.3.", "16.3 sürümünden 16.2 sürümüne yükseltin."),
             (

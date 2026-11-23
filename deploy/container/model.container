@@ -4,6 +4,7 @@ Description=Postgres Gündem yerel çeviri
 Image=@PG_IMAGE@
 Pull=never
 ContainerName=postgres-gundem-model
+Label=net.postgres-gundem.root=@PG_ROOT@
 @USERNS@
 Network=postgres-gundem-private:alias=model
 Exec=/bin/sh /app/container/model-start.sh
@@ -16,8 +17,10 @@ HealthCmd=python /app/container/probe.py model
 HealthInterval=30s
 HealthRetries=3
 HealthStartPeriod=180s
-PodmanArgs=--memory=2880m --memory-swap=2880m --cpus=2
 [Service]
+MemoryMax=2880M
+MemorySwapMax=0
+CPUQuota=200%
 Restart=always
 TimeoutStartSec=300
 [Install]

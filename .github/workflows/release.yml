@@ -105,8 +105,18 @@ jobs:
           openssl pkeyutl -sign -rawin -inkey "$RUNNER_TEMP/release.key" -in out/release.json -out out/release.sig
           openssl pkeyutl -verify -rawin -pubin -inkey deploy/container/release.pub -in out/release.json -sigfile out/release.sig
           cp VERSION deploy/container/
+          cp licenses/TranslateGemma-*.txt deploy/container/
           tar -czf out/kurulum.tar.gz -C deploy container
           (cd out && sha256sum kurulum.tar.gz > kurulum.tar.gz.sha256)
+      - name: İlk ve çevrimdışı kurulum için model parçaları
+        run: |
+          if [[ $(jq -r .parts_release deploy/container/model.json) == "$GITHUB_REF_NAME" ]]; then
+            PG_ROOT="$RUNNER_TEMP/weights" bash deploy/container/get-model.sh
+            split -b 1300M -d "$RUNNER_TEMP/weights/models/$(jq -r .file deploy/container/model.json)" out/model.gguf.part-
+            cp licenses/TranslateGemma-*.txt out/
+            cp deploy/container/model.json out/
+            (cd out && sha256sum model.gguf.part-* > model-parts.sha256)
+          fi
       - name: Kararlı sürümü yayımla
         run: |
           if gh release view "$GITHUB_REF_NAME" --json isDraft > "$RUNNER_TEMP/state.json" 2>/dev/null; then
@@ -115,5 +125,8 @@ jobs:
             gh release create "$GITHUB_REF_NAME" --verify-tag --draft --title "Postgres Gündem $GITHUB_REF_NAME" --notes-file release/notes.txt
           fi
           gh release upload "$GITHUB_REF_NAME" --clobber out/release.json out/release.sig out/image-*.tar.gz out/kurulum.tar.gz*
+          if [[ -f out/model-parts.sha256 ]]; then
+            gh release upload "$GITHUB_REF_NAME" --clobber out/model.gguf.part-* out/model-parts.sha256 out/model.json out/TranslateGemma-*.txt
+          fi
           gh release edit "$GITHUB_REF_NAME" --draft=false --latest
 

@@ -4,6 +4,8 @@ PostgreSQL’in güvenlik duyurularını, etkilenen ve düzeltilen sürümleri, 
 
 ## Hetzner’de Docker ile temiz kurulum
 
+Varsayılan çevirmen TranslateGemma 4B Q4_K_M, 40 DBA cümlesinin 38'inde teknik ve dil denetimlerini geçti. Önceki Riva modeli aynı denetimlerin 28'ini geçti. [Örnek çeviriler ve 4B modellerin bellek ayarları](release/translation-report.md)
+
 Linux ARM64 veya x86-64, Docker Engine ve Compose v2 gerekir. Kurucu sunucudaki Bash, Python 3.9+, OpenSSL 3, curl ve tar araçlarını kullanır. Model sunucunun işlemcisiyle çalışır. Ağırlıkları bellek eşleme ile açar ve bir seferde bir metin çevirir. Model ve SQLite yeni sürümlerde de aynı sunucu klasörlerinde kalır.
 
 Root olarak aşağıdaki komutları çalıştırın. Adımlar ilk kararlı sürüme sabitlenmiştir. İndirdiğiniz kurulum paketinin özetini sürüm sayfasındaki değerle de karşılaştırabilirsiniz. [Kararlı sürüm](https://github.com/EnezMutluoglu/postgres-gundem/releases/tag/v1.0.0)
@@ -24,6 +26,16 @@ bash install.sh docker
 ```
 
 Modeli başka makinede indirdiyseniz `bash get-model.sh /root/model.gguf` kullanın. Betik özeti denetler. Kurucu yönetici parolasını terminalde iki kez sorar. Panelin, veritabanının ve modelin sağlık kontrollerini bekler. GHCR erişimi kısıtlandığında kurucu aynı imajın GitHub Release içindeki imzalı bildirimle doğrulanan kopyasını kullanır. Sunucuda model eğitimi veya derleme yapılmaz.
+
+### Çalışan Hetzner panelinden geçiş
+
+Eski kurulumda haber geçmişinizi korumak için yukarıdaki paketi açtıktan sonra `container` dizininde son iki komut yerine `bash hetzner-gecis.sh` çalıştırın. Model parçalarını önceden aktardıysanız `bash hetzner-gecis.sh /root/model-parcalari` kullanın. Betik önce modeli doğrular, eski servisleri durdurur, SQLite'ın doğrulanmış kopyasını ve aylık arşivleri aktarır. Yeni servisler sağlık kontrolünden geçince eski birimlerin otomatik başlangıcını kapatır. Ardından aşağıdaki Cloudflare rotasını değiştirin.
+
+Eski uygulama ve haberler sırasıyla `/opt/postgres-gundem` ve `/var/lib/postgres-gundem` altında kalır. Alan açmadan önce yeni panelden haber geçmişini ve tünelden erişimi kontrol edin. Eski köprü gerekiyorsa `172.17.0.1:18080` adresiyle önceki kurulum için kullanılabilir. Geçiş yarıda kaldıysa betik hedef veritabanının üzerine yazmaz. Hatanın nedenini giderip kopya üzerinden devam etmek için eski servisleri durdurduktan sonra aynı dizinde `bash install.sh docker` çalıştırabilirsiniz.
+
+### Modeli dosyadan kurma
+
+Çevrimdışı model kurulumu için sürüm sayfasındaki `model.gguf.part-00`, `model.gguf.part-01` ve `model-parts.sha256` dosyalarını aynı klasöre aktarın. Bu klasörde `sha256sum -c model-parts.sha256` çalıştırın. Kurulum dizininde `bash get-model.sh /root/model-parcalari` parçaları birleştirip modelin tamamını doğrular. Model Google TranslateGemma'nın GGUF uyarlamasıdır. [Model, dönüştürme bilgisi ve lisans](https://huggingface.co/Menterium/translategemma-4b-it-GGUF/tree/d1709f49e90452b9189e0144cc6826d199616921)
 
 ### Cloudflare Tunnel
 

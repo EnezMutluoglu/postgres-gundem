@@ -4,5 +4,6 @@
   "bytes": 2489909312,
   "sha256": "e7d9523174272fca61264b339f06d10c6115426267bb0f752b0124084e487b8e",
   "url": "https://huggingface.co/Menterium/translategemma-4b-it-GGUF/resolve/d1709f49e90452b9189e0144cc6826d199616921/translategemma-4b-it-Q4_K_M.gguf",
-  "license": "https://ai.google.dev/gemma/terms"
+  "license": "https://ai.google.dev/gemma/terms",
+  "parts_release": "v1.0.0"
 }

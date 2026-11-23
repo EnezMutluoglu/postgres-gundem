@@ -19,6 +19,10 @@ for source, required, forbidden in cases:
         answer = app.translate(source)
         good = (
             app.safe_instruction(source, answer)
+            and app.reasons_supported(source, answer)
+            and app.terms_preserved(app.glossary_for(source), answer)
+            and sorted(app.TECHNICAL.findall(source))
+            == sorted(app.TECHNICAL.findall(answer))
             and all(re.search(p, answer, re.I) for p in required)
             and not any(re.search(p, answer, re.I) for p in forbidden)
         )

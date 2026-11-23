@@ -1,0 +1,602 @@
+[
+  {
+    "en": "Take a full backup before applying the maintenance update.",
+    "TranslateGemma": {
+      "tr": "Bakım güncellemesini uygulamadan önce tam bir yedek alın.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "Bakım güncellemesini uygulama öncesinde tam bir yedek almanız gerekir.",
+      "passed": true
+    },
+    "OPUS": {
+      "tr": "Bakım güncellemesini uygulamadan önce tam bir yedek alın.",
+      "passed": true
+    }
+  },
+  {
+    "en": "For security reasons, take a full backup before applying the maintenance update.",
+    "TranslateGemma": {
+      "tr": "Güvenlik nedenleriyle, bakım güncellemesini uygulamadan önce tam bir yedek alın.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "Güvenlik amaçları nedeniyle, bakım güncellemesini uygulama öncesinde tam bir yedek alın.",
+      "passed": true
+    },
+    "OPUS": {
+      "tr": "Çevirideki gerekçe kaynak cümleyle uyuşmuyor",
+      "passed": false
+    }
+  },
+  {
+    "en": "Do not restart the primary server.",
+    "TranslateGemma": {
+      "tr": "Birincil sunucuyu yeniden başlatmayın.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "Birincil sunucuyu yeniden başlatmayın.",
+      "passed": true
+    },
+    "OPUS": {
+      "tr": "Birincil sunucuyu yeniden başlatma.",
+      "passed": false
+    }
+  },
+  {
+    "en": "Restart the standby server.",
+    "TranslateGemma": {
+      "tr": "Bekleme sunucusunu yeniden başlatın.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "Durum bekleme sunucusunu yeniden başlatın.",
+      "passed": true
+    },
+    "OPUS": {
+      "tr": "Bekleme sunucusunu yeniden başlatın.",
+      "passed": true
+    }
+  },
+  {
+    "en": "The primary server writes new WAL records.",
+    "TranslateGemma": {
+      "tr": "Birincil sunucu, yeni WAL kayıtlarını kaydeder.",
+      "passed": false
+    },
+    "Riva": {
+      "tr": "Birincil sunucu yeni WAL kayıtları yazmaktadır.",
+      "passed": true
+    },
+    "OPUS": {
+      "tr": "Birincil sunucu yeni WAL kayıtları yazar.",
+      "passed": true
+    }
+  },
+  {
+    "en": "The standby server replays WAL records.",
+    "TranslateGemma": {
+      "tr": "Bekleme sunucusu, WAL kayıtlarını yeniden oynatır.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "Bekleme sunucusu WAL kayıtlarını tekrar oynatır.",
+      "passed": true
+    },
+    "OPUS": {
+      "tr": "Bekleme sunucusu WAL kayıtlarını tekrar oynatır.",
+      "passed": true
+    }
+  },
+  {
+    "en": "PostgreSQL 16.3 fixes this issue.",
+    "TranslateGemma": {
+      "tr": "PostgreSQL 16.3, bu sorunu düzeltir.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "PostgreSQL 16.3 bu sorunu gideriyor.",
+      "passed": true
+    },
+    "OPUS": {
+      "tr": "PostgreSQL 16.3 bu sorunu düzeltir.",
+      "passed": true
+    }
+  },
+  {
+    "en": "Versions before 15.7 are affected.",
+    "TranslateGemma": {
+      "tr": "15.7'den önceki sürümler etkilenmektedir.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "15.7'den önceki sürümler etkilenmektedir.",
+      "passed": true
+    },
+    "OPUS": {
+      "tr": "15.7'den önceki sürümler etkilenir.",
+      "passed": true
+    }
+  },
+  {
+    "en": "Versions from 15.7 onward are unaffected.",
+    "TranslateGemma": {
+      "tr": "15.7 ve sonraki sürümler etkilenmeyecektir.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "15.7 ve daha sonraki sürümler etkilenmiyor.",
+      "passed": true
+    },
+    "OPUS": {
+      "tr": "15.7'den sonraki sürümler etkilenmez.",
+      "passed": false
+    }
+  },
+  {
+    "en": "Upgrade from 14.11 to 14.12.",
+    "TranslateGemma": {
+      "tr": "14.11 sürümünden 14.12 sürümüne yükseltin.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "14.11 sürümünden 14.12 sürümüne yükseltin.",
+      "passed": true
+    },
+    "OPUS": {
+      "tr": "14.11'den 14.12'ye yükseltme.",
+      "passed": true
+    }
+  },
+  {
+    "en": "This maintenance release includes bug fixes.",
+    "TranslateGemma": {
+      "tr": "Bu bakım sürümü, hata düzeltmeleri içerir.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "Bu bakım sürümü hataları düzeltir.",
+      "passed": true
+    },
+    "OPUS": {
+      "tr": "Bu bakım sürümü hata düzeltmelerini içerir.",
+      "passed": true
+    }
+  },
+  {
+    "en": "Schedule a maintenance window.",
+    "TranslateGemma": {
+      "tr": "Bakım penceresi için bir zamanlama planı oluştur.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "Bir bakım penceresi planlayın.",
+      "passed": true
+    },
+    "OPUS": {
+      "tr": "Bakım penceresi ayarla.",
+      "passed": true
+    }
+  },
+  {
+    "en": "The security update is available now.",
+    "TranslateGemma": {
+      "tr": "Güvenlik güncellemesi şu anda kullanılabilir.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "Güvenlik güncellemesi şimdi mevcuttur.",
+      "passed": true
+    },
+    "OPUS": {
+      "tr": "Güvenlik güncellemesi şu anda mevcut.",
+      "passed": true
+    }
+  },
+  {
+    "en": "Use a full backup to restore the database.",
+    "TranslateGemma": {
+      "tr": "Tam bir yedek kullanarak veritabanını geri yükleyin.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "Veritabanını geri yüklemek için tam bir yedek kullanın.",
+      "passed": true
+    },
+    "OPUS": {
+      "tr": "Veritabanını geri yüklemek için tam bir yedekleme kullanın.",
+      "passed": true
+    }
+  },
+  {
+    "en": "The database can remain online.",
+    "TranslateGemma": {
+      "tr": "Veritabanı çevrimiçi durumda kalabilir.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "Veritabanı online olarak kalabilir.",
+      "passed": false
+    },
+    "OPUS": {
+      "tr": "Veritabanı çevrimiçi kalabilir.",
+      "passed": true
+    }
+  },
+  {
+    "en": "A service restart is not required.",
+    "TranslateGemma": {
+      "tr": "Hizmetin yeniden başlatılması gerekli değildir.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "Servis yeniden başlatılması gerekmez.",
+      "passed": true
+    },
+    "OPUS": {
+      "tr": "Bir hizmet yeniden başlatılması gerekli değildir.",
+      "passed": true
+    }
+  },
+  {
+    "en": "A service restart is required.",
+    "TranslateGemma": {
+      "tr": "Hizmetin yeniden başlatılması gerekmektedir.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "Bir hizmet yeniden başlatılması gerekir.",
+      "passed": true
+    },
+    "OPUS": {
+      "tr": "Bir hizmet yeniden başlatılması gereklidir.",
+      "passed": true
+    }
+  },
+  {
+    "en": "Run REINDEX after applying the patch.",
+    "TranslateGemma": {
+      "tr": "Yama uygulandıktan sonra REINDEX komutunu çalıştırın.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "Yama uygulandıktan sonra REINDEX'i çalıştırın.",
+      "passed": true
+    },
+    "OPUS": {
+      "tr": "Yamayı uyguladıktan sonra REINDEX'i çalıştırın.",
+      "passed": true
+    }
+  },
+  {
+    "en": "Do not run VACUUM during recovery.",
+    "TranslateGemma": {
+      "tr": "Kurtarma sırasında VACUUM komutunu çalıştırmayın.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "Kurtarma sırasında VACUUM'u çalıştırmayın.",
+      "passed": true
+    },
+    "OPUS": {
+      "tr": "Teknik terim çeviride korunmadı",
+      "passed": false
+    }
+  },
+  {
+    "en": "Logical replication is enabled by default.",
+    "TranslateGemma": {
+      "tr": "Mantıksal çoğaltma varsayılan olarak etkinleştirilmiştir.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "Eksik çeviri",
+      "passed": false
+    },
+    "OPUS": {
+      "tr": "Mantıksal çoğaltma varsayılan olarak etkinleştirilir.",
+      "passed": true
+    }
+  },
+  {
+    "en": "The query planner can use this index.",
+    "TranslateGemma": {
+      "tr": "Sorgu planlayıcısı, bu indeksi kullanabilir.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "Eksik çeviri",
+      "passed": false
+    },
+    "OPUS": {
+      "tr": "Sorgu planlayıcısı bu indeksi kullanabilir.",
+      "passed": true
+    }
+  },
+  {
+    "en": "Row-level security applies to this table.",
+    "TranslateGemma": {
+      "tr": "Satır düzeyinde güvenlik, bu tablo için geçerlidir.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "Bu tabloya satır düzeyinde güvenlik uygulanmaktadır.",
+      "passed": true
+    },
+    "OPUS": {
+      "tr": "Satır düzeyinde güvenlik bu tablo için geçerlidir.",
+      "passed": true
+    }
+  },
+  {
+    "en": "The release candidate is ready for testing.",
+    "TranslateGemma": {
+      "tr": "Sürüm adayı test için hazır.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "Sürüm adayı test edilmek için hazırdır.",
+      "passed": true
+    },
+    "OPUS": {
+      "tr": "PostgreSQL terimi sözlükteki karşılığıyla çevrilmedi",
+      "passed": false
+    }
+  },
+  {
+    "en": "The minor release does not change the file format.",
+    "TranslateGemma": {
+      "tr": "Bakım sürümü dosya formatını değiştirmez.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "Eksik çeviri",
+      "passed": false
+    },
+    "OPUS": {
+      "tr": "PostgreSQL terimi sözlükteki karşılığıyla çevrilmedi",
+      "passed": false
+    }
+  },
+  {
+    "en": "The extension adds support for JSON data.",
+    "TranslateGemma": {
+      "tr": "Bu eklenti, JSON veri desteğini ekler.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "Uzantı, JSON verilerine destek ekliyor.",
+      "passed": true
+    },
+    "OPUS": {
+      "tr": "Uzantı JSON verileri için destek ekler.",
+      "passed": true
+    }
+  },
+  {
+    "en": "This change affects only read-only transactions.",
+    "TranslateGemma": {
+      "tr": "Bu değişiklik yalnızca salt okunur işlemlere etki eder.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "PostgreSQL terimi sözlükteki karşılığıyla çevrilmedi",
+      "passed": false
+    },
+    "OPUS": {
+      "tr": "Bu değişiklik sadece salt okunur işlemleri etkiler.",
+      "passed": true
+    }
+  },
+  {
+    "en": "The connection pool is full.",
+    "TranslateGemma": {
+      "tr": "Bağlantı havuzu dolu.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "Bağlantı havuzu dolu.",
+      "passed": true
+    },
+    "OPUS": {
+      "tr": "Bağlantı havuzu dolu.",
+      "passed": true
+    }
+  },
+  {
+    "en": "The temporary table is dropped at commit.",
+    "TranslateGemma": {
+      "tr": "Geçici tablo, commit işlemi sırasında silinir.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "Geçici tablo, işleme sırasında silinir.",
+      "passed": true
+    },
+    "OPUS": {
+      "tr": "Geçici tablo taahhütte düşürülür.",
+      "passed": false
+    }
+  },
+  {
+    "en": "A unique constraint prevents duplicate entries.",
+    "TranslateGemma": {
+      "tr": "Benzersiz bir kısıtlama, yinelenen girişleri engeller.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "Özel bir kısıtlama, tekrarlanan kayıtları önler.",
+      "passed": false
+    },
+    "OPUS": {
+      "tr": "Benzersiz bir kısıtlama, yinelenen girişleri önler.",
+      "passed": true
+    }
+  },
+  {
+    "en": "The transaction was rolled back.",
+    "TranslateGemma": {
+      "tr": "İşlem geri alınmıştır.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "İşlem geri çekildi.",
+      "passed": false
+    },
+    "OPUS": {
+      "tr": "İşlem geri alındı.",
+      "passed": true
+    }
+  },
+  {
+    "en": "A missing index can slow down this query.",
+    "TranslateGemma": {
+      "tr": "Eksik bir indeks, bu sorguyu yavaşlatabilir.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "Yanlış bir indeks, bu sorgunun hızını düşürebilir.",
+      "passed": false
+    },
+    "OPUS": {
+      "tr": "Eksik bir indeks bu sorguyu yavaşlatabilir.",
+      "passed": true
+    }
+  },
+  {
+    "en": "The release notes include upgrade instructions.",
+    "TranslateGemma": {
+      "tr": "Sürüm notları, yükseltme talimatlarını içerir.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "Eksik çeviri",
+      "passed": false
+    },
+    "OPUS": {
+      "tr": "Sürüm notları yükseltme talimatlarını içerir.",
+      "passed": true
+    }
+  },
+  {
+    "en": "Apply the patch to each database.",
+    "TranslateGemma": {
+      "tr": "Her veritabanına yama uygulayın.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "Her veritabanına yama uygulayın.",
+      "passed": true
+    },
+    "OPUS": {
+      "tr": "Yamayı her veritabanına uygulayın.",
+      "passed": true
+    }
+  },
+  {
+    "en": "Only PostgreSQL 15.4 is affected.",
+    "TranslateGemma": {
+      "tr": "Sadece PostgreSQL 15.4 sürümü etkilenmektedir.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "Sadece PostgreSQL 15.4 etkilenmektedir.",
+      "passed": true
+    },
+    "OPUS": {
+      "tr": "Sadece PostgreSQL 15.4 etkilenir.",
+      "passed": true
+    }
+  },
+  {
+    "en": "Check the system catalogs before upgrading.",
+    "TranslateGemma": {
+      "tr": "Yükseltmeden önce sistem kataloglarını kontrol edin.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "Yükleme yapmadan önce sistem kataloğlarını kontrol edin.",
+      "passed": false
+    },
+    "OPUS": {
+      "tr": "Yükseltmeden önce sistem kataloglarını kontrol edin.",
+      "passed": true
+    }
+  },
+  {
+    "en": "The server rejects invalid SQL statements.",
+    "TranslateGemma": {
+      "tr": "Sunucu, geçersiz SQL ifadelerini reddeder.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "Sunucu, geçersiz SQL ifadelerini reddeder.",
+      "passed": true
+    },
+    "OPUS": {
+      "tr": "Sunucu geçersiz SQL ifadelerini reddeder.",
+      "passed": true
+    }
+  },
+  {
+    "en": "Restart the service to reload the configuration.",
+    "TranslateGemma": {
+      "tr": "Hizmeti yeniden başlatın, böylece yapılandırmayı yeniden yükleyebilirsiniz.",
+      "passed": false
+    },
+    "Riva": {
+      "tr": "Konfigürasyonu yeniden yüklemek için servisi yeniden başlatın.",
+      "passed": false
+    },
+    "OPUS": {
+      "tr": "Çevirideki gerekçe kaynak cümleyle uyuşmuyor",
+      "passed": false
+    }
+  },
+  {
+    "en": "This fix prevents data loss.",
+    "TranslateGemma": {
+      "tr": "Bu düzeltme, veri kaybını önler.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "Bu düzeltme, verilerin kaybolmasını önler.",
+      "passed": false
+    },
+    "OPUS": {
+      "tr": "Bu düzeltme veri kaybını önler.",
+      "passed": true
+    }
+  },
+  {
+    "en": "The backup does not include temporary tables.",
+    "TranslateGemma": {
+      "tr": "Yedekleme, geçici tabloları içermiyor.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "Yedekleme, geçici tabloları içermez.",
+      "passed": true
+    },
+    "OPUS": {
+      "tr": "Yedekleme geçici tablolar içermez.",
+      "passed": true
+    }
+  },
+  {
+    "en": "A new WAL segment is created after the checkpoint.",
+    "TranslateGemma": {
+      "tr": "Yeni bir WAL segmenti, kontrol noktası işleminden sonra oluşturulur.",
+      "passed": true
+    },
+    "Riva": {
+      "tr": "Denetim noktası sonrasında yeni bir WAL segmenti oluşturulur.",
+      "passed": true
+    },
+    "OPUS": {
+      "tr": "Kontrol noktasından sonra yeni bir WAL segmenti oluşturulur.",
+      "passed": true
+    }
+  }
+]

@@ -207,6 +207,10 @@ GLOSSARY = [
     ("recovery", "kurtarma", r"kurtar"),
     ("read-only transaction", "salt okunur işlem", r"salt okunur işlem"),
     ("release notes", "sürüm notları", r"sürüm not"),
+    ("replication slot", "çoğaltma yuvası", r"(?:çoğaltma|replikasyon) (?:yuva|slot)"),
+    ("transaction block", "işlem bloğu", r"işlem blo[kğ]"),
+    ("deadlock", "karşılıklı kilitlenme", r"(?:karşılıklı kilitlenme|ölü kilit)"),
+    ("isolation level", "yalıtım düzeyi", r"(?:yalıtım|izolasyon) (?:düzey|seviye)"),
 ]
 
 
@@ -214,7 +218,9 @@ def glossary_for(original):
     return [
         term
         for term in GLOSSARY
-        if re.search(r"\b" + re.escape(term[0]) + r"s?\b", original, re.IGNORECASE)
+        if re.search(
+            r"\b" + re.escape(term[0]) + r"(?:es|s)?\b", original, re.IGNORECASE
+        )
     ]
 
 
@@ -567,27 +573,33 @@ def safe_instruction(source, target):
     versions = r"\b\d+(?:\.\d+)+\b"
     if re.findall(versions, source) != re.findall(versions, target):
         return False
-    if re.search(r"\b(?:not|never|unaffected|unnecessary)\b", source, re.I):
+    unaffected = re.search(
+        r"\betkilen(?:mez|miyor|memekte|memiş|meyecek|medi|meyen|meyebilir)",
+        target,
+        re.I,
+    )
+    if (
+        re.search(r"\b(?:not|never|unaffected|unnecessary)\b", source, re.I)
+        and not unaffected
+    ):
         if not re.search(
-            r"değil|gerekmez|gerekmi|[a-zçğıöşü](?:mayın|meyin|mamalı|memeli|maz|mez|miyor|mıyor|muyor|müyor|mamak|memek|mamaktadır|memektedir)|etkilenme",
+            r"değil|gerekmez|gerekmi|[a-zçğıöşü](?:mayın|meyin|mamalı|memeli|maz|mez|miyor|mıyor|muyor|müyor|mamak|memek|mamaktadır|memektedir)",
             target,
             re.I,
         ):
             return False
-    if re.search(r"\b(?:unaffected|not affected)\b", source, re.I) and not re.search(
-        r"etkilenm", target, re.I
-    ):
+    if re.search(r"\b(?:unaffected|not affected)\b", source, re.I) and not unaffected:
         return False
     if re.search(r"\bfrom [\d.]+ (?:onward|onwards)\b", source, re.I) and not re.search(
         r"\b(?:ve (?:daha )?sonra|d[âa]hil|itibaren|başlayarak)", target, re.I
     ):
         return False
-    if re.search(r"\b(?:is|are) affected\b", source, re.I) and re.search(
-        r"etkilenm|etkilenen.*değil", target, re.I
+    if re.search(r"\b(?:is|are) affected\b", source, re.I) and (
+        unaffected or re.search(r"etkilenen.*değil", target, re.I)
     ):
         return False
     if re.search(r"\bcommit(?:ted)?\b", source, re.I) and re.search(
-        r"taahhü|taahhü[tüd]|vaat", target, re.I
+        r"taahhü|vaat", target, re.I
     ):
         return False
     if re.search(r"\b(?:run|apply|restart|upgrade)\b", source, re.I) and not re.search(
@@ -685,7 +697,9 @@ def bulletin():
 
 @app.after_request
 def no_stale_alerts(response):
-    response.headers["Cache-Control"] = "no-cache"
+    response.headers["Cache-Control"] = (
+        "private, no-store" if request.path.startswith("/api/admin/") else "no-cache"
+    )
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["Content-Security-Policy"] = (

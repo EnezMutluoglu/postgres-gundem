@@ -11,7 +11,9 @@ if [[ -f $dest ]] && verify "$dest"; then echo 'Yerel model doğrulandı.'; exit
 echo "Model lisansı: ${fields[3]}"
 tmp=$(mktemp "$base/models/.indir.XXXXXXXX")
 trap 'rm -f -- "$tmp"' EXIT
-if [[ $# -eq 1 ]]; then cp -- "$1" "$tmp"
+if [[ $# -gt 1 ]]; then echo 'Kullanım: bash get-model.sh [model.gguf veya parça klasörü]'; exit 2
+elif [[ $# -eq 1 && -d $1 ]]; then cat -- "$1"/model.gguf.part-* >"$tmp"
+elif [[ $# -eq 1 ]]; then cp -- "$1" "$tmp"
 else curl -fL --retry 3 --proto '=https' "${fields[2]}" -o "$tmp"; fi
 verify "$tmp" || { echo 'Model özeti uyuşmadı.' >&2; exit 1; }
 chmod 644 "$tmp"

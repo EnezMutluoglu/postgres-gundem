@@ -6,6 +6,7 @@ COPY release/build-engine.sh /build-engine.sh
 RUN curl -fsSL --retry 4 https://codeload.github.com/ggml-org/llama.cpp/tar.gz/refs/tags/b12532 -o /tmp/src.tgz && bash /build-engine.sh "$TARGETARCH" /tmp/src.tgz /out && mkdir /engine && tar -xf /out/*.tar.gz --strip-components=1 -C /engine
 FROM docker:29-cli AS cli
 FROM python:3.11-slim-bookworm
+LABEL org.opencontainers.image.source="https://github.com/EnezMutluoglu/postgres-gundem"
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates openssl libgomp1 && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY requirements.txt .

@@ -4,6 +4,7 @@ Description=Postgres Gündem bülteni
 Image=@PG_IMAGE@
 Pull=never
 ContainerName=postgres-gundem-web
+Label=net.postgres-gundem.root=@PG_ROOT@
 User=@RUN_UID@:@RUN_GID@
 @USERNS@
 Network=postgres-gundem-origin:alias=postgres-gundem
@@ -21,8 +22,8 @@ HealthCmd=python /app/container/probe.py web
 HealthInterval=30s
 HealthRetries=3
 HealthStartPeriod=30s
-PodmanArgs=--memory=384m
 [Service]
+MemoryMax=384M
 Restart=always
 TimeoutStartSec=300
 [Install]

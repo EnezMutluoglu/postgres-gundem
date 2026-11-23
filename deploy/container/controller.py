@@ -300,7 +300,7 @@ class Manager:
     def start(self, m):
         self.configure(m)
         if self.engine == "docker":
-            self.compose("up", "-d", "--remove-orphans")
+            self.compose("up", "-d", "web", "model")
         else:
             run(
                 *self.system,
@@ -350,7 +350,7 @@ class Manager:
                     shutil.copyfileobj(src, f)
                 f.flush()
                 os.fsync(f.fileno())
-                os.chown(tmp, self.env["uid"], self.env["gid"])
+                os.fchown(f.fileno(), self.env["uid"], self.env["gid"])
                 for ext in ("-wal", "-shm", "-journal"):
                     Path(str(self.db) + ext).unlink(missing_ok=True)
                 os.replace(tmp, self.db)

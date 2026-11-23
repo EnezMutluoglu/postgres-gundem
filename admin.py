@@ -6,6 +6,7 @@ import os
 import re
 import secrets
 import shutil
+import sqlite3
 import threading
 import time
 from collections import deque
@@ -32,6 +33,7 @@ def register(web, data, model, database, pending_count):
         SESSION_COOKIE_SECURE=True,
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Strict",
+        SESSION_REFRESH_EACH_REQUEST=False,
         PERMANENT_SESSION_LIFETIME=timedelta(minutes=30),
         MAX_CONTENT_LENGTH=16384,
     )
@@ -120,17 +122,22 @@ def register(web, data, model, database, pending_count):
                 model_ok = json.load(r).get("status") == "ok"
         except (OSError, ValueError):
             model_ok = False
-        with database() as con:
-            last = con.execute("SELECT MAX(success) FROM sources").fetchone()[0]
-            err = con.execute(
-                "SELECT value FROM state WHERE key='translation_error'"
-            ).fetchone()
-            queue = pending_count(con)
+        database_ok = True
+        try:
+            with database() as con:
+                last = con.execute("SELECT MAX(success) FROM sources").fetchone()[0]
+                err = con.execute(
+                    "SELECT value FROM state WHERE key='translation_error'"
+                ).fetchone()
+                queue = pending_count(con)
+        except (OSError, sqlite3.Error, ValueError):
+            database_ok = False
+            last = err = queue = None
         archives = sorted((data / "arsiv").glob("gundem-????-??.sqlite.gz"))
         return jsonify(
             version=version,
             model=model_ok,
-            database=True,
+            database=database_ok,
             last_scan=last,
             pending=queue,
             translation_error=json.loads(err[0]) if err else None,
