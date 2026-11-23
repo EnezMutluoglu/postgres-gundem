@@ -5,7 +5,7 @@ import json
 import logging
 import re
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
@@ -21,6 +21,24 @@ PLANET = "https://planet.postgresql.org/"
 DIRECTORY = PLANET + "feeds.html"
 INTL = "https://www.postgresql.org/community/international/"
 SEARCH = "https://news.google.com/rss/search"
+# Publication paths and article bodies on the projects' own sites.
+PROJECTS = {
+    "https://postgis.net/sitemap.xml": (
+        "PostGIS",
+        r"/\d{4}/\d{2}/[^/]+/",
+        "section.gdoc-markdown",
+    ),
+    "https://www.citusdata.com/sitemap.xml": (
+        "Citus",
+        r"/blog/\d{4}/\d{2}/\d{2}/[^/]+/",
+        "main.blog-article-content",
+    ),
+    "https://cloudnative-pg.io/sitemap.xml": (
+        "CloudNativePG",
+        r"/(?:blog|releases)/[^/]+/",
+        "div.mx-auto.my-10:has(> p)",
+    ),
+}
 # lang, publisher, feed, publisher domain (the French feed aggregates several publishers).
 FEEDS = (
     (
@@ -85,7 +103,7 @@ MARKETS = {
 }
 NETWORK = {
     urlsplit(s).netloc
-    for s in [PLANET, DIRECTORY, INTL, SEARCH, *[f[2] for f in FEEDS]]
+    for s in [PLANET, DIRECTORY, INTL, SEARCH, *PROJECTS, *[f[2] for f in FEEDS]]
 }
 WEEK = 7 * 86400
 SHARED_HOSTS = {
@@ -112,6 +130,7 @@ SHARED_HOSTS = {
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS press_sources(host TEXT PRIMARY KEY, name TEXT NOT NULL, evidence TEXT NOT NULL, approved INTEGER NOT NULL, seen INTEGER NOT NULL, verified INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS press_checks(task TEXT PRIMARY KEY, due INTEGER NOT NULL, checked INTEGER, error TEXT);
+CREATE TABLE IF NOT EXISTS press_project_pages(url TEXT PRIMARY KEY, origin TEXT NOT NULL, due INTEGER NOT NULL, checked INTEGER, error TEXT);
 CREATE TABLE IF NOT EXISTS press_articles(id INTEGER PRIMARY KEY, url TEXT UNIQUE NOT NULL, host TEXT NOT NULL, title_key TEXT NOT NULL, current_revision INTEGER);
 CREATE INDEX IF NOT EXISTS press_title ON press_articles(host,title_key);
 CREATE TABLE IF NOT EXISTS press_revisions(id INTEGER PRIMARY KEY, article INTEGER NOT NULL, signature TEXT NOT NULL, lang TEXT NOT NULL, title TEXT NOT NULL, excerpt TEXT NOT NULL, original TEXT NOT NULL, published TEXT NOT NULL, observed INTEGER NOT NULL, origin TEXT NOT NULL, rank INTEGER NOT NULL, link TEXT NOT NULL, title_tr TEXT, excerpt_tr TEXT, retry INTEGER NOT NULL DEFAULT 0, error TEXT, UNIQUE(article, signature));
@@ -154,20 +173,30 @@ def network_url(url):
 
 
 class Redirect(HTTPRedirectHandler):
+    def __init__(self, project=None):
+        super().__init__()
+        self.project = project
+
     def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if self.project and not project_url(self.project, newurl):
+            raise ValueError("Proje sayfası başka bir adrese yönlendirildi")
         return super().redirect_request(
             req, fp, code, msg, headers, network_url(newurl)
         )
 
 
-def fetch(url):
+def fetch(url, project=None):
+    if project and not project_url(project, url):
+        raise ValueError("Makale adresi projenin yayın dizinine ait değil")
     req = Request(
         network_url(url),
         headers={
             "User-Agent": "PostgresGundem/1.1 (+https://github.com/EnezMutluoglu/postgres-gundem)"
         },
     )
-    with build_opener(Redirect()).open(req, timeout=18) as r:
+    with build_opener(Redirect(project)).open(req, timeout=18) as r:
+        if project and canonical(r.url) != url:
+            raise ValueError("Makalenin son adresi site haritasıyla eşleşmedi")
         raw = r.read(6_000_001)
     if len(raw) > 6_000_000:
         raise ValueError("Akış boyut sınırını aştı")
@@ -228,6 +257,8 @@ def setup(con):
     for _, name, url, h in FEEDS:
         if h:
             record_source(con, h, name, url, True, 0)
+    for url, (name, _, _) in PROJECTS.items():
+        record_source(con, host(url), name, url, True, 0)
 
 
 def directory(con, url, raw, ts):
@@ -329,7 +360,7 @@ def store(con, url, h, lang, title, summary, body, pub, origin, rank, ts):
     )
 
 
-def parse_feed(con, raw, lang, name, domain, origin, ts, search=False):
+def parse_feed(con, raw, lang, name, domain, origin, ts, search=False, window=None):
     if b"<!ENTITY" in raw.upper() or b"<!DOCTYPE" in raw.upper():
         raise ValueError("Beklenmeyen XML bildirimi")
     root = ET.fromstring(raw)
@@ -356,6 +387,11 @@ def parse_feed(con, raw, lang, name, domain, origin, ts, search=False):
         ).strip()
         h = host(link)
         title = text(val("title"))
+        pub = date_value(
+            val("published") or val("pubDate") or val("updated") or val("date")
+        )
+        if window and not window[0] <= pub[:10] <= window[1]:
+            continue
         summary = val("summary") or val("description")
         body = val("encoded") or val("content") or summary
         if search:
@@ -400,9 +436,7 @@ def parse_feed(con, raw, lang, name, domain, origin, ts, search=False):
             title,
             summary,
             body,
-            date_value(
-                val("published") or val("pubDate") or val("updated") or val("date")
-            ),
+            pub,
             origin,
             0 if search else 2 if domain else 1,
             ts,
@@ -436,7 +470,122 @@ def planet(con, raw, ts):
         )
 
 
-def jobs():
+def project_url(origin, url):
+    if not url or canonical(url) != url:
+        return False
+    parts = urlsplit(url)
+    return (
+        parts.netloc == urlsplit(origin).netloc
+        and not parts.query
+        and bool(re.fullmatch(PROJECTS[origin][1], parts.path))
+    )
+
+
+def project_index(con, raw, origin, ts):
+    if b"<!DOCTYPE" in raw.upper() or b"<!ENTITY" in raw.upper():
+        raise ValueError("Beklenmeyen site haritası bildirimi")
+    root = ET.fromstring(raw)
+    if root.tag.split("}")[-1] != "urlset":
+        raise ValueError("Proje site haritası okunamadı")
+    cutoff = datetime.fromtimestamp(ts, timezone.utc).date() - timedelta(days=365)
+    found = False
+    for entry in root.findall("{*}url"):
+        url = entry.findtext("{*}loc") or ""
+        if not project_url(origin, url):
+            continue
+        found = True
+        path = urlsplit(url).path
+        dated = re.search(r"/(\d{4})/(\d{2})/", path)
+        modified = date_value(entry.findtext("{*}lastmod"))
+        if dated and "-".join(dated.groups()) < cutoff.isoformat()[:7]:
+            continue
+        if modified and modified[:10] < cutoff.isoformat():
+            continue
+        con.execute(
+            "INSERT OR IGNORE INTO press_project_pages(url,origin,due) VALUES(?,?,0)",
+            (url, origin),
+        )
+    if not found:
+        raise ValueError("Site haritasında proje haberleri bulunamadı")
+
+
+def project_article(raw, origin, url):
+    doc = BeautifulSoup(raw, "html.parser")
+    for node in doc.select(
+        'link[rel="canonical"][href],meta[property="og:url"][content]'
+    ):
+        target = node.get("href") or node.get("content")
+        if canonical(target).rstrip("/") != url.rstrip("/"):
+            raise ValueError("Yayıncının makale adresi eşleşmedi")
+
+    def meta(key):
+        n = doc.select_one(f'meta[property="{key}"]')
+        return n.get("content", "") if n else ""
+
+    stamp = date_value(meta("article:published_time"))
+    if not stamp:
+        day = re.search(r"/(\d{4})/(\d{2})/(\d{2})/", urlsplit(url).path)
+        stamp = date_value("-".join(day.groups())) if day else ""
+    heading = doc.select_one("h1")
+    title = meta("og:title") or (heading.get_text(" ", strip=True) if heading else "")
+    article = doc.select_one(PROJECTS[origin][2])
+    if not stamp or not title or not article:
+        raise ValueError("Proje haberinin tarihi, başlığı veya metni doğrulanamadı")
+    body = "\n".join(
+        n.get_text(" ", strip=True)
+        for n in article.select("p,li,pre")
+        if not n.find_parent(["li", "pre"])
+    )
+    if not body.strip():
+        raise ValueError("Proje haberinin metni boş")
+    return title, meta("og:description"), body, stamp
+
+
+def check_project_pages(db, fetcher, clock):
+    ts = int(clock())
+    with db() as con:
+        pages = con.execute(
+            "SELECT url,origin FROM press_project_pages WHERE due<=? ORDER BY due,url",
+            (ts,),
+        ).fetchall()
+    for url, origin in pages:
+        try:
+            raw = fetcher(url, project=origin)
+            title, summary, body, stamp = project_article(raw, origin, url)
+            published = datetime.fromisoformat(stamp).timestamp()
+            if published > ts + 86400:
+                raise ValueError("Proje haberinin yayın tarihi gelecekte")
+            active = published >= ts - 365 * 86400
+            with db() as con:
+                if active:
+                    store(
+                        con,
+                        url,
+                        host(url),
+                        "en",
+                        title,
+                        summary,
+                        body,
+                        stamp,
+                        origin,
+                        3,
+                        ts,
+                    )
+                con.execute(
+                    "UPDATE press_project_pages SET checked=?,due=?,error=NULL WHERE url=?",
+                    (ts, ts + WEEK if active else 2**62, url),
+                )
+        except Exception as exc:
+            logging.warning("Proje haberi doğrulanamadı %s: %s", url, exc)
+            with db() as con:
+                con.execute(
+                    "UPDATE press_project_pages SET due=?,error=? WHERE url=?",
+                    (ts + 3600, str(exc)[:160], url),
+                )
+
+
+def jobs(today=None):
+    today = today or datetime.now(timezone.utc).date()
     yield DIRECTORY, DIRECTORY, lambda c, b, t: directory(c, DIRECTORY, b, t)
     yield INTL, INTL, lambda c, b, t: directory(c, INTL, b, t)
     for lang, name, url, h in FEEDS:
@@ -448,32 +597,46 @@ def jobs():
             ),
         )
     yield PLANET, PLANET, planet
-    for lang, country in MARKETS.items():
-        query = urlencode(
-            {
-                "q": "(PostgreSQL OR Postgres OR CloudNativePG OR pgBackRest OR pgvector) when:14d",
-                "hl": lang,
-                "gl": country,
-                "ceid": country + ":" + lang,
-            }
-        )
-        yield (
-            "search/" + lang,
-            SEARCH + "?" + query,
-            lambda c, b, t, language=lang: parse_feed(
-                c, b, language, "", "", SEARCH, t, search=True
-            ),
-        )
+    for origin in PROJECTS:
+        yield origin, origin, lambda c, b, t, u=origin: project_index(c, b, u, t)
+    cutoff = today - timedelta(days=365)
+    end = today
+    while end >= cutoff:
+        start = max(end.replace(day=1), cutoff)
+        month = end.strftime("%Y-%m")
+        for lang, country in MARKETS.items():
+            query = urlencode(
+                {
+                    "q": "(PostgreSQL OR Postgres OR PostGIS OR Citus OR CloudNativePG OR pgBackRest OR pgvector) "
+                    f"after:{start - timedelta(days=1)} before:{end + timedelta(days=1)}",
+                    "hl": lang,
+                    "gl": country,
+                    "ceid": country + ":" + lang,
+                }
+            )
+            yield (
+                f"search/{month}/{lang}",
+                SEARCH + "?" + query,
+                lambda c, b, t, language=lang, window=(start.isoformat(), end.isoformat()): (
+                    parse_feed(
+                        c, b, language, "", "", SEARCH, t, search=True, window=window
+                    )
+                ),
+            )
+        end = start - timedelta(days=1)
 
 
 def scan(db, fetcher=fetch, clock=time.time):
-    for task, url, parse in jobs():
+    today = datetime.fromtimestamp(clock(), timezone.utc).date()
+    with db() as con:
+        due = dict(con.execute("SELECT task,due FROM press_checks"))
+    projects_checked = False
+    for task, url, parse in jobs(today):
         ts = int(clock())
-        with db() as con:
-            marker = con.execute(
-                "SELECT due FROM press_checks WHERE task=?", (task,)
-            ).fetchone()
-        if marker and marker[0] > ts:
+        if task.startswith("search/") and not projects_checked:
+            check_project_pages(db, fetcher, clock)
+            projects_checked = True
+        if due.get(task, 0) > ts:
             continue
         try:
             raw = fetcher(url)
@@ -481,7 +644,17 @@ def scan(db, fetcher=fetch, clock=time.time):
                 parse(con, raw, ts)
                 con.execute(
                     "INSERT OR REPLACE INTO press_checks VALUES(?,?,?,NULL)",
-                    (task, ts + WEEK, ts),
+                    (
+                        task,
+                        ts
+                        + (
+                            366 * 86400
+                            if task.startswith("search/")
+                            and task.split("/")[1] != today.strftime("%Y-%m")
+                            else WEEK
+                        ),
+                        ts,
+                    ),
                 )
         except Exception as exc:
             logging.warning("Dış basın taranamadı %s: %s", task, exc)
@@ -499,7 +672,7 @@ def scan(db, fetcher=fetch, clock=time.time):
             (DIRECTORY, INTL, ts - WEEK),
         ).fetchone()[0]
         if healthy == 2:
-            seeds = [s[3] for s in FEEDS if s[3]]
+            seeds = [s[3] for s in FEEDS if s[3]] + [host(u) for u in PROJECTS]
             marks = ",".join("?" for _ in seeds)
             con.execute(
                 f"UPDATE press_sources SET approved=0 WHERE verified<? AND host NOT IN ({marks})",
@@ -628,6 +801,8 @@ def register(app, db):
         if lang_filter:
             where += " AND r.lang=?"
             params.append(lang_filter)
+        if request.args.get("konu") == "teknoloji":
+            where += " AND EXISTS(SELECT 1 FROM press_project_pages p WHERE p.url=a.url AND p.checked IS NOT NULL)"
         joined = (
             " FROM press_articles a JOIN press_revisions r ON r.id=a.current_revision"
         )
@@ -640,6 +815,8 @@ def register(app, db):
                 """SELECT a.id,a.url,a.host,r.id AS revision,r.lang,r.title,r.title_tr,r.excerpt,r.excerpt_tr,r.published,r.observed,r.error,r.origin
                 ,EXISTS(SELECT 1 FROM translation_tasks j WHERE j.kind='press' AND j.ref=CAST(r.id AS TEXT) AND j.status='failed') AS original_only
                 ,(SELECT count(*) FROM press_revisions v WHERE v.article=a.id) AS versions
+                ,(SELECT checked FROM press_project_pages p WHERE p.url=a.url) AS link_checked
+                ,(SELECT error IS NOT NULL FROM press_project_pages p WHERE p.url=a.url) AS link_failed
                 """
                 + joined
                 + where
@@ -654,9 +831,15 @@ def register(app, db):
                     "SELECT DISTINCT r.lang" + joined + " ORDER BY r.lang"
                 )
             ]
-            health = con.execute(
-                "SELECT min(checked), max(checked),sum(error IS NOT NULL),count(*) FROM press_checks"
-            ).fetchone()
+            active_tasks = {task for task, _, _ in jobs()}
+            health = [
+                r
+                for r in con.execute("SELECT task,checked,error FROM press_checks")
+                if r["task"] in active_tasks
+            ]
+            page_errors = con.execute(
+                "SELECT count(*) FROM press_project_pages WHERE error IS NOT NULL"
+            ).fetchone()[0]
             candidates = con.execute(
                 "SELECT count(*) FROM press_sources WHERE approved=0"
             ).fetchone()[0]
@@ -666,10 +849,10 @@ def register(app, db):
             languages=langs,
             total=total,
             page=page,
-            checked=health[1],
-            errors=health[2] or 0,
-            checked_tasks=health[3],
-            expected_tasks=sum(1 for _ in jobs()),
+            checked=max((r["checked"] for r in health if r["checked"]), default=None),
+            errors=sum(bool(r["error"]) for r in health) + page_errors,
+            checked_tasks=sum(r["checked"] is not None for r in health),
+            expected_tasks=len(active_tasks),
             candidates=candidates,
         )
 

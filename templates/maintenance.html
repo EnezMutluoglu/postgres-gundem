@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ note.title if note else 'Bakım sürümü arşivi' }} · Postgres Gündem</title>
+<link rel="icon" href="/static/elephant.png"><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/press.css"></head>
+<body><header class="mast"><div class="shell mast-inner"><a class="brand" href="/"><img src="/static/elephant.png" alt="" width="37" height="38"><span>Postgres<span class="brand-light">Gündem</span></span></a><nav aria-label="Ana menü"><a href="/">Bülten</a><a href="/bakim" class="active">Bakım sürümleri</a><a href="/dis-basin">Dış basın</a><a href="/arama">Arama</a></nav></div></header>
+<main class="shell press archive-search">
+{% if note %}
+  <p><a href="{{ url_for('maintenance_archive') }}#pg-{{ note.series }}">← PostgreSQL {{ note.series }} bakım sürümleri</a></p>
+  <article class="card"><div class="byline">Bakım sürümü · <time>{{ note.date }}</time></div><h1>{{ note.title }}</h1>
+  {% for label,field in [('Bu sürüme geçiş','scope'),('Düzeltmeler','notes')] %}
+    {% if note.get(field) %}<h2>{{ label }}</h2>{% endif %}
+    {% for paragraph in note.get(field,[]) %}
+      {% if paragraph in note.verbatim %}<pre class="release-code">{{ paragraph }}</pre>
+      {% elif field == 'notes' and loop.index0 in note.change_heads %}<h3 {% if not tr[paragraph] %}lang="en"{% endif %}>{{ tr[paragraph] or paragraph }}</h3>
+      {% else %}<p {% if not tr[paragraph] %}lang="en"{% endif %}>{{ tr[paragraph] or paragraph }}</p>{% endif %}
+      {% if tr.get(paragraph) %}<details><summary>Özgün metin</summary><p lang="en">{{ paragraph }}</p></details>
+      {% elif paragraph not in note.verbatim %}<small class="byline">Özgün metin · Türkçe çeviri henüz doğrulanmadı.</small>{% endif %}
+    {% endfor %}
+  {% endfor %}
+  <p><a href="{{ note.url }}" target="_blank" rel="noopener noreferrer">PostgreSQL sürüm notunu aç ↗</a></p></article>
+{% else %}
+  <div class="page-heading"><h1>Bakım sürümü arşivi<span>.</span></h1></div>
+  {% if not status or status.error %}<p role="status">{{ 'Eksik sürüm notları sonraki kontrolde yeniden alınacak.' if status and status.error else 'İlk tarama sürüyor. Alınan sürümler burada görünür.' }}</p>{% endif %}
+  <nav class="press-filters" aria-label="Ana sürümler">{% for row in rows %}{% if loop.changed(row.series) %}<a href="#pg-{{ row.series }}">PostgreSQL {{ row.series }}</a>{% endif %}{% endfor %}</nav>
+  {% for series, releases in rows|groupby('series')|sort(attribute='grouper',reverse=true) %}
+  <section id="pg-{{ series }}"><h2>PostgreSQL {{ series }}</h2><ul>{% for row in releases %}<li><a href="{{ url_for('maintenance_archive',version=row.version) }}">{{ row.version }}</a> · <time>{{ row.date }}</time></li>{% endfor %}</ul></section>
+  {% endfor %}
+{% endif %}
+</main></body></html>

@@ -1,6 +1,10 @@
 .press {
   padding-bottom: 3rem;
 }
+.release-code {
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
 .press-layout {
   display: grid;
   grid-template-columns: minmax(0, 2.2fr) minmax(240px, 1fr);

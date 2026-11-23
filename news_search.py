@@ -25,6 +25,7 @@ CREATE TRIGGER IF NOT EXISTS news_text_update AFTER UPDATE OF translation ON tex
   INSERT OR IGNORE INTO news_dirty SELECT doc FROM news_phrases WHERE phrase=NEW.original; END;
 """
 KINDS = {
+    "maintenance": "Bakım sürümü notları",
     "release": "Sürüm bülteni",
     "dev": "Geliştirme",
     "security": "Güvenlik",

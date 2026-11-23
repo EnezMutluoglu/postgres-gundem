@@ -7,6 +7,7 @@
 {% if doc %}
   <p><a href="{{ url_for('search',q=q,alan=kind,sayfa=page) }}">← Aramaya dön</a></p>
   <article class="card"><div class="byline">{{ kinds[doc.kind] }} · {{ doc.source }} · {{ doc.date }}</div><h1>{{ doc.title }}</h1>
+  {% if doc.kind == 'maintenance' %}<p><a href="{{ url_for('maintenance_archive',version=doc.story.split(':')[1]) }}">Düzeltmeleri ve geçiş notlarını sürüm sayfasında oku →</a></p>{% endif %}
   {% for paragraph in doc.translated %}<p>{{ paragraph }}</p>{% endfor %}
   {% if doc.partial %}<p class="byline">Kalan bölümleri aşağıdaki özgün metinde okuyabilirsiniz.</p>{% endif %}
   {% if doc.original or doc.original_title != doc.title %}

@@ -84,6 +84,9 @@ function article(row) {
     document.createTextNode(" · "),
     link("Kaynağında oku ↗", row.url),
   );
+  if (row.link_checked) item.append(node("p", (row.link_failed
+    ? "Son bağlantı denemesi başarısız. Son doğrulama "
+    : "Yayıncı bağlantısı doğrulandı · ") + dates.format(new Date(row.link_checked * 1000)), "byline"));
   if (row.versions > 1) {
     const history = node("details");
     history.append(node("summary", "Arşivdeki önceki kayıtlar"));
@@ -123,6 +126,7 @@ async function load() {
       sayfa: page,
       kaynak: el("publisher").value,
       dil: el("language").value,
+      konu: el("topic").value,
     });
   try {
     const response = await fetch("/api/dis-basin?" + params, {
@@ -198,8 +202,10 @@ el("directory").ontoggle = async () => {
   }
 };
 el("source-search").oninput = el("trust").onchange = showDirectory;
-el("publisher").onchange = el("language").onchange = () => {
+el("topic").value = new URLSearchParams(location.search).get("konu") === "teknoloji" ? "teknoloji" : "";
+el("publisher").onchange = el("language").onchange = el("topic").onchange = () => {
   page = 1;
+  history.replaceState(null, "", el("topic").value ? "?konu=teknoloji" : location.pathname);
   load();
 };
 el("previous").onclick = () => {

@@ -108,6 +108,10 @@ jobs:
           cp licenses/TranslateGemma-*.txt deploy/container/
           tar -czf out/kurulum.tar.gz -C deploy container
           (cd out && sha256sum kurulum.tar.gz > kurulum.tar.gz.sha256)
+          package_sha=$(cut -d' ' -f1 out/kurulum.tar.gz.sha256)
+          sed -e "s/^tag=.*/tag=$GITHUB_REF_NAME/" -e 's/^bundle=.*/bundle=kurulum.tar.gz/' \
+            -e "s/^package_sha=.*/package_sha=$package_sha/" deploy/hetzner-kur.sh > out/hetzner-kur.sh
+          bash -n out/hetzner-kur.sh
       - name: İlk ve çevrimdışı kurulum için model parçaları
         run: |
           if [[ $(jq -r .parts_release deploy/container/model.json) == "$GITHUB_REF_NAME" ]]; then
@@ -124,7 +128,7 @@ jobs:
           else
             gh release create "$GITHUB_REF_NAME" --verify-tag --draft --title "Postgres Gündem $GITHUB_REF_NAME" --notes-file release/notes.txt
           fi
-          gh release upload "$GITHUB_REF_NAME" --clobber out/release.json out/release.sig out/image-*.tar.gz out/kurulum.tar.gz*
+          gh release upload "$GITHUB_REF_NAME" --clobber out/release.json out/release.sig out/image-*.tar.gz out/kurulum.tar.gz* out/hetzner-kur.sh
           if [[ -f out/model-parts.sha256 ]]; then
             gh release upload "$GITHUB_REF_NAME" --clobber out/model.gguf.part-* out/model-parts.sha256 out/model.json out/TranslateGemma-*.txt
           fi

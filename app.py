@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.request import Request, urlopen
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, abort, jsonify, render_template, request, send_from_directory
 from waitress import serve
 from langdetect import DetectorFactory, LangDetectException, detect_langs
 from archive import archive
@@ -31,6 +31,7 @@ MODEL_TIMEOUT = int(os.environ.get("GUNDEM_MODEL_TIMEOUT", "200"))
 PORT = int(os.environ.get("GUNDEM_PORT", "8080"))
 SOURCES = {
     "releases": "Sürüm duyuruları",
+    "maintenance": "Bakım sürümü arşivi",
     "security": "Güvenlik kayıtları",
     "notes": "Geliştirme notları",
     "commitfest": "CommitFest",
@@ -153,6 +154,37 @@ def source_status(source, error=None):
 def collect(source):
     if source == "versions":
         state("versions", feeds.versions())
+    elif source == "maintenance":
+        with db() as con:
+            known = {
+                r[0]
+                for r in con.execute("SELECT id FROM items WHERE source='maintenance'")
+            }
+        errors = []
+        for major, info in reversed(list(feeds.versions().items())):
+            if (
+                not major.isdecimal()
+                or int(major) < 15
+                or info["latest"] == f"{major}.0"
+            ):
+                continue
+            try:
+                entries = feeds.maintenance_index(major)
+                if info["latest"] not in entries:
+                    errors.append(info["latest"])
+                for version, url in entries.items():
+                    if f"bakim:{version}" in known:
+                        continue
+                    try:
+                        save(source, [feeds.maintenance_note(version, url)])
+                    except Exception:
+                        logging.exception("Bakım sürümü okunamadı: %s", version)
+                        errors.append(version)
+            except Exception:
+                logging.exception("Bakım sürümü dizini okunamadı: %s", major)
+                errors.append(major)
+        if errors:
+            raise ValueError("Bakım kaydı bekleniyor: " + ", ".join(errors))
     elif source == "security":
         errors = []
         # Publish individual verified advisories even if another page is temporarily unavailable.
@@ -213,8 +245,8 @@ def text_fields(item):
         yield item["title"]
     if item.get("summary"):
         yield item["summary"]
-    yield from item.get("scope", [])
-    yield from item.get("notes", [])
+    for key in ("scope", "notes"):
+        yield from (s for s in item.get(key, []) if s not in item.get("verbatim", ()))
 
 
 # The Turkish patterns allow case endings and plural forms, including kaydı/kayıtları.
@@ -622,7 +654,9 @@ def press_translation(original, language, *, guided=False):
 
 def priority(item):
     kind = item["kind"]
-    base = {"release": 0, "extension": 1, "dev": 2, "security": 3}[kind]
+    base = {"release": 0, "extension": 1, "dev": 2, "security": 3, "maintenance": 6}[
+        kind
+    ]
     if item.get("label") == "PostgreSQL ile gelir":
         base = 5
     return (
@@ -769,9 +803,17 @@ def bulletin():
     with db() as con:
         con.execute("BEGIN")
         meta = {r[0]: json.loads(r[1]) for r in con.execute("SELECT * FROM state")}
+        project_news = [
+            dict(row) for row in con.execute("""
+                SELECT r.id AS revision, coalesce(nullif(r.title_tr,''),r.title) AS title,
+                       r.published AS date,s.name
+                FROM press_project_pages p JOIN press_articles a ON a.url=p.url
+                JOIN press_revisions r ON r.id=a.current_revision JOIN press_sources s ON s.host=a.host
+                WHERE p.checked IS NOT NULL ORDER BY r.published DESC,r.id DESC LIMIT 2
+            """)
+        ]
         sources = {r["name"]: dict(r) for r in con.execute("SELECT * FROM sources")}
-        tr = dict(con.execute("SELECT original,translation FROM texts"))
-        tr.update(EDITORIAL)
+        tr = dict(EDITORIAL)
         fallback = {
             r[0]
             for r in con.execute(
@@ -779,14 +821,23 @@ def bulletin():
             )
         }
         items = []
-        for row in con.execute("SELECT * FROM items ORDER BY id"):
+        for row in con.execute(
+            "SELECT * FROM items WHERE source!='maintenance' ORDER BY id"
+        ):
             item = json.loads(row["data"])
             item.update(seq=row["seq"], observed=row["observed"], source=row["source"])
-            item["tr"] = {s: tr[s] for s in text_fields(item) if s in tr}
+            for s in text_fields(item):
+                if s not in tr:
+                    saved = con.execute(
+                        "SELECT translation FROM texts WHERE original=?", (s,)
+                    ).fetchone()
+                    tr[s] = saved[0] if saved else ""
+            item["tr"] = {s: tr[s] for s in text_fields(item) if tr.get(s)}
             item["original_only"] = [s for s in text_fields(item) if s in fallback]
             items.append(item)
     response = jsonify(
         items=items,
+        project_news=project_news,
         meta=meta,
         sources=[
             dict(
@@ -823,6 +874,41 @@ news_search.register(app, db, EDITORIAL)
 @app.get("/dis-basin")
 def press_page():
     return send_from_directory(app.static_folder, "press.html")
+
+
+@app.get("/bakim")
+@app.get("/bakim/<version>")
+def maintenance_archive(version=None):
+    with db() as con:
+        con.execute("BEGIN")
+        rows = con.execute("""
+            SELECT json_extract(data,'$.version') AS version, CAST(json_extract(data,'$.series') AS INTEGER) AS series,
+                   json_extract(data,'$.date') AS date FROM items WHERE source='maintenance'
+            ORDER BY series DESC, CAST(substr(version,instr(version,'.')+1) AS INTEGER) DESC
+        """).fetchall()
+        note = None
+        translations = {}
+        if version is not None:
+            row = con.execute(
+                "SELECT data FROM items WHERE source='maintenance' AND id=?",
+                ("bakim:" + version,),
+            ).fetchone()
+            if not row:
+                abort(404)
+            note = json.loads(row[0])
+            for phrase in set(text_fields(note)):
+                saved = con.execute(
+                    "SELECT translation FROM texts WHERE original=?", (phrase,)
+                ).fetchone()
+                translations[phrase] = EDITORIAL.get(phrase) or (
+                    saved[0] if saved else ""
+                )
+        status = con.execute(
+            "SELECT success,error FROM sources WHERE name='maintenance'"
+        ).fetchone()
+    return render_template(
+        "maintenance.html", rows=rows, note=note, tr=translations, status=status
+    )
 
 
 def monthly():

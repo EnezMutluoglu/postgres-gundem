@@ -261,7 +261,12 @@ function renderSides() {
     dev.find((i) => i.source === "commitfest"),
   ].filter(Boolean);
   $("dev-list").innerHTML =
-    highlights.map(sideRow).join("") ||
+    highlights.map(sideRow).join("") +
+    (dataset.project_news || []).map((r) =>
+      '<a class="side-row" href="/arsiv/oku/-' + Number(r.revision) +
+      '"><span class="side-meta">' + badge(r.name, "teal") + displayDay(r) +
+      '</span><h4>' + esc(r.title) + '</h4></a>'
+    ).join("") ||
     empty("Geliştirme haberleri bekleniyor.");
   $("ext-list").innerHTML =
     sorted("extension").slice(0, 3).map(sideRow).join("") ||

@@ -122,6 +122,82 @@ def paragraphs_between(heading):
                 yield compact(clean(node))
 
 
+def maintenance_index(major):
+    base = f"{PG}/docs/{major}/"
+    doc = page(base + "release.html")
+    links = {}
+    for a in doc.select("#docContent .toc a[href]"):
+        match = re.fullmatch(rf"release-{major}-([1-9]\d*)\.html", a["href"])
+        if match:
+            links[f"{major}.{match[1]}"] = base + a["href"]
+    return links
+
+
+def maintenance_note(version, url):
+    article = page(url).select_one("#docContent div.sect1")
+    if article:
+        for anchor in article.select("a.id_link"):
+            anchor.decompose()
+    if article is None or not re.search(
+        rf"\bRelease {re.escape(version)}$", clean(article.select_one("h2"))
+    ):
+        raise ValueError(f"{version} bakım sürümü doğrulanamadı")
+    stamp = next(
+        (
+            date.fromisoformat(m[1])
+            for p in article.find_all("p", recursive=False)
+            if (m := re.fullmatch(r"Release date:\s*(\d{4}-\d{2}-\d{2})", clean(p)))
+        ),
+        None,
+    )
+    groups = {}
+    verbatim = []
+    change_heads = []
+    for section in article.select("div.sect2"):
+        heading = clean(section.select_one("h3"))
+        if heading.endswith("Changes"):
+            key = "notes"
+        elif heading.endswith("Migration to Version " + version):
+            key = "scope"
+        else:
+            continue
+        for mark in section.select("a.ulink"):
+            if mark.get_text(strip=True) == "§":
+                mark.decompose()
+        blocks = []
+        for node in section.select("p, pre"):
+            if node.find_parent(["p", "pre"]):
+                continue
+            value = node.get_text().strip()
+            if node.name == "pre":
+                verbatim.append(value)
+            else:
+                value = compact(value)
+            if value:
+                if (
+                    key == "notes"
+                    and node.parent.name == "li"
+                    and node.parent.find(["p", "pre"]) is node
+                ):
+                    change_heads.append(len(blocks))
+                blocks.append(value)
+        groups[key] = blocks
+    if not stamp or not groups.get("notes"):
+        raise ValueError(f"{version} bakım sürümü tarihi veya düzeltmeleri okunamadı")
+    return record(
+        "maintenance",
+        url,
+        f"PostgreSQL {version}",
+        id=f"bakim:{version}",
+        version=version,
+        series=version.split(".")[0],
+        date=stamp.isoformat(),
+        verbatim=verbatim,
+        change_heads=change_heads,
+        **groups,
+    )
+
+
 def releases():
     archive = page(PG + "/about/newsarchive/pgsql/")
     items = []

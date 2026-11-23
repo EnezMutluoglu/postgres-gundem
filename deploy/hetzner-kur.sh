@@ -6,6 +6,8 @@ docker info >/dev/null
 docker compose version >/dev/null
 
 tag=v1.1.3
+bundle=kurulum-manuel-2.tar.gz
+package_sha=95eb6d756ce008cd234f6393edd126d04f91abd0f64309f24627bb7fd4be7c0b
 export PG_ROOT=/srv/postgres-gundem
 mode=${1:-kur}
 [[ $mode == kur || $mode == --sadece-guncelleyici ]] || { echo 'Kullanım: bash postgres-gundem-kur.sh [--sadece-guncelleyici]' >&2; exit 1; }
@@ -13,8 +15,8 @@ dir=/root/postgres-gundem-kurulum/$tag/manuel
 mkdir -p "$dir"
 cd "$dir"
 curl --fail --location --retry 3 --proto '=https' \
-  "https://github.com/EnezMutluoglu/postgres-gundem/releases/download/$tag/kurulum-manuel-2.tar.gz" -o kurulum.tar.gz
-echo '95eb6d756ce008cd234f6393edd126d04f91abd0f64309f24627bb7fd4be7c0b  kurulum.tar.gz' | sha256sum -c -
+  "https://github.com/EnezMutluoglu/postgres-gundem/releases/download/$tag/$bundle" -o kurulum.tar.gz
+printf '%s  kurulum.tar.gz\n' "$package_sha" | sha256sum -c -
 tar -xzf kurulum.tar.gz
 cd container
 

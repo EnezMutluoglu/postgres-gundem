@@ -2,7 +2,11 @@
 
 PostgreSQL’in güvenlik duyurularını, etkilenen ve düzeltilen sürümleri, geliştirme notlarını ve eklentileri Türkçe gösteren tek sayfalık bülten. Haber kaynakları saatte bir kontrol edilir. Etkilenen sürüm ve yama bilgisi PostgreSQL’in yayımladığı kayıtlardan okunur. Ağ bağlantısı kesildiğinde son bülten okunabilir.
 
-**Dış basın** sekmesi yayıncı, özgün dil ve tarihle birlikte topluluk haberlerini gösterir. İlk açılışta ve ardından yedi günde bir doğrudan yayın akışları, PostgreSQL topluluğunun iki kaynak dizini, Planet ve 18 bölgesel Google Haberler araması taranır. Her görevin zamanı SQLite’a kaydedilir. Başarısız olan görev bir saat sonra yeniden denenir. Arama sonuçlarındaki yeni yayıncılar aday listesine girer. Haber yayımlamak için yayıncının bilinen kaynaklar veya topluluk dizinleriyle eşleşmesi gerekir. Dizinlerden çıkan yayıncılar için üç haftalık doğrulama süresi vardır. [Planet kaynak dizini](https://planet.postgresql.org/feeds.html) · [Uluslararası topluluklar](https://www.postgresql.org/community/international/)
+**Bakım sürümü arşivi** PostgreSQL 15 ve sonraki ana sürümlerin yayımlanmış bakım notlarını ilk kurulumda ve eski panelden geçişte toplar. **Sürüm sürüm bakım notlarını oku** bağlantısında ana sürümü ve bakım sürümünü seçin. Her sürüm sayfasında geçiş talimatları, düzeltilen sorunlar ve resmî belge bağlantısı bulunur. Yerel çeviriler hazır oldukça özgün paragrafların yanında saklanır. Sonraki taramalarda kaydedilmiş sürüm sayfaları atlanır. Eksik kalanlar bir sonraki taramada tamamlanır.
+
+**Dış basın** sekmesi yayıncı, özgün dil ve tarihle birlikte topluluk haberlerini gösterir. İlk açılışta ve ardından yedi günde bir doğrudan yayın akışları, PostgreSQL topluluğunun iki kaynak dizini, Planet ve 18 bölgesel Google Haberler araması taranır. İlk tarama son 365 günü aylık aralıklara böler. Açık ay haftalık denetlenir ve ay kapandığında son günleri de taranır. Arama kapsamı yayıncıların ve haber dizininin sunduğu sonuçlara bağlıdır. Her görevin zamanı SQLite’a kaydedilir. Başarısız olan görev bir saat sonra yeniden denenir. Arama sonuçlarındaki yeni yayıncılar aday listesine girer. Haber yayımlamak için yayıncının bilinen kaynaklar veya topluluk dizinleriyle eşleşmesi gerekir. Dizinlerden çıkan yayıncılar için üç haftalık doğrulama süresi vardır. [Planet kaynak dizini](https://planet.postgresql.org/feeds.html) · [Uluslararası topluluklar](https://www.postgresql.org/community/international/)
+
+**Geliştirme günlüğü → Dış kaynaklardan eklenti ve teknoloji haberleri** bölümünde PostGIS, Citus ve CloudNativePG yayınları yer alır. Panel bu projelerin site haritalarından makale adreslerini bulur, makaleyi yayıncının kendi alanında açar ve yayın tarihini kontrol eder. Bir yıllık izleme aralığındaki makaleler haftalık olarak tekrar denetlenir. Adres açılmazsa tarama bir saat sonra yeniden denenir. Son doğrulanmış kopya arşivde okunabilir. [PostGIS](https://postgis.net/news/) · [Citus](https://www.citusdata.com/blog/) · [CloudNativePG](https://cloudnative-pg.io/blog/)
 
 Başlangıç kaynakları arasında Crunchy Data, CYBERTEC, CloudNativePG, Dalibo, PostgreSQL Europe, JPUG, ITPUG, PostgreSQL Türkiye ve Fransızca Planète ağı bulunur. Yerel model başlığı ve akış özetini kaynak dilinden Türkçeye çevirir. Kaynağın sağladığı özgün metin, yayın adresi ve sonraki değişiklikler SQLite’ta kalır. Çeviri hazırlanırken veya teknik doğrulama başarısız olduğunda özgün metne erişilebilir. Haber akışında yalnız başlık varsa panel yalnız başlığı sunar. [Crunchy Data](https://www.crunchydata.com/blog) · [Planète PostgreSQL](https://www.postgresql.fr/planete) · [JPUG](https://www.postgresql.jp/)
 
@@ -20,26 +24,26 @@ Varsayılan çevirmen TranslateGemma 4B Q4_K_M, 40 DBA cümlesinin 38'inde tekni
 
 Linux ARM64 veya x86-64, Docker Engine ve Compose v2 gerekir. Kurucu sunucudaki Bash, Python 3.9+, OpenSSL 3, curl ve tar araçlarını kullanır. Model sunucunun işlemcisiyle çalışır. Ağırlıkları bellek eşleme ile açar ve bir seferde bir metin çevirir. Model ve SQLite yeni sürümlerde de aynı sunucu klasörlerinde kalır.
 
-**Hetzner sunucusuna doğrudan indirmek için** root terminalinde şu komutu çalıştırın. Kurucu v1.1.3 paketini doğrular, uygun yerel model varsa onu kullanır ve gerekirse modeli sunucuya indirir. İlk kurulumda panel yöneticisi için 6 ile 512 karakter arasında bir parola ister. Eski systemd paneli varsa hizmetlerini durdurur. Eski haber arşivi `/var/lib/postgres-gundem` altında kalır. Yeni Docker kurulumunun veri dizini `/srv/postgres-gundem/data` olur.
+**Hetzner sunucusuna doğrudan indirmek için** root terminalinde şu komutu çalıştırın. Kurucu v1.2.0 paketini doğrular, uygun yerel model varsa onu kullanır ve gerekirse modeli sunucuya indirir. İlk kurulumda panel yöneticisi için 6 ile 512 karakter arasında bir parola ister. Eski systemd paneli varsa hizmetlerini durdurur. Eski haber arşivi `/var/lib/postgres-gundem` altında kalır. Yeni Docker kurulumunun veri dizini `/srv/postgres-gundem/data` olur.
 
 ```bash
-curl -fL --retry 3 https://github.com/EnezMutluoglu/postgres-gundem/releases/download/v1.1.3/hetzner-kur-manuel-2.sh -o /root/postgres-gundem-kur.sh && bash /root/postgres-gundem-kur.sh
+curl -fL --retry 3 https://github.com/EnezMutluoglu/postgres-gundem/releases/download/v1.2.0/hetzner-kur.sh -o /root/postgres-gundem-kur.sh && bash /root/postgres-gundem-kur.sh
 ```
 
 Kurucu aynı Docker sunucusunda çalışan tek bir `cloudflare/cloudflared` bağlayıcısını otomatik seçer ve tünelin ağından paneli sınar. Birden fazla bağlayıcınız veya özel imajınız varsa `CLOUDFLARED_CONTAINER=konteyner-adı bash /root/postgres-gundem-kur.sh` kullanın. Mevcut Cloudflare rotasında **Type** değerini `HTTP`, **URL** değerini `postgres-gundem:8080` yapın. Bağlayıcı Compose ile yeniden oluşturuluyorsa aşağıdaki [Cloudflare Tunnel](#cloudflare-tunnel) ağ ayarını da uygulayın.
 
-Root olarak aşağıdaki komutları çalıştırın. Adımlar dış basın arşivini içeren v1.1.3 sürümüne sabitlenmiştir. İndirdiğiniz kurulum paketinin özetini sürüm sayfasındaki değerle de karşılaştırabilirsiniz. [Kararlı sürüm](https://github.com/EnezMutluoglu/postgres-gundem/releases/tag/v1.1.3)
+Root olarak aşağıdaki komutları çalıştırın. Adımlar dış basın arşivini içeren v1.2.0 sürümüne sabitlenmiştir. İndirdiğiniz kurulum paketinin özetini sürüm sayfasındaki değerle de karşılaştırabilirsiniz. [Kararlı sürüm](https://github.com/EnezMutluoglu/postgres-gundem/releases/tag/v1.2.0)
 
 ```bash
 set -e
 cd /root
 mkdir -p postgres-gundem-kurulum
 cd postgres-gundem-kurulum
-url=https://github.com/EnezMutluoglu/postgres-gundem/releases/download/v1.1.3
-curl -fLO "$url/kurulum-manuel-2.tar.gz"
-curl -fLO "$url/kurulum-manuel-2.tar.gz.sha256"
-sha256sum -c kurulum-manuel-2.tar.gz.sha256
-tar -xzf kurulum-manuel-2.tar.gz
+url=https://github.com/EnezMutluoglu/postgres-gundem/releases/download/v1.2.0
+curl -fLO "$url/kurulum.tar.gz"
+curl -fLO "$url/kurulum.tar.gz.sha256"
+sha256sum -c kurulum.tar.gz.sha256
+tar -xzf kurulum.tar.gz
 cd container
 bash get-model.sh
 bash install.sh docker
@@ -50,7 +54,7 @@ Modeli başka makinede indirdiyseniz `bash get-model.sh /root/model.gguf` kullan
 Eski Docker kurulumunda saatlik yazılım denetimini kaldırmak için root oturumunda aşağıdaki komutu bir kez çalıştırın. Betik yalnızca güncelleyici konteynerini yeniden başlatır.
 
 ```bash
-curl -fL --retry 3 https://github.com/EnezMutluoglu/postgres-gundem/releases/download/v1.1.3/hetzner-kur-manuel-2.sh -o /root/postgres-gundem-kur.sh && bash /root/postgres-gundem-kur.sh --sadece-guncelleyici
+curl -fL --retry 3 https://github.com/EnezMutluoglu/postgres-gundem/releases/download/v1.2.0/hetzner-kur.sh -o /root/postgres-gundem-kur.sh && bash /root/postgres-gundem-kur.sh --sadece-guncelleyici
 ```
 
 ### Çalışan Hetzner panelinden geçiş
