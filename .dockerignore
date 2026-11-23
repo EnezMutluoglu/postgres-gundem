@@ -6,6 +6,9 @@
 !archive.py
 !feeds.py
 !community.py
+!news_search.py
+!templates/
+!templates/**
 !turkish.json
 !requirements.txt
 !VERSION

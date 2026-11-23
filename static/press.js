@@ -73,7 +73,13 @@ function article(row) {
     }
     item.append(details);
   }
-  item.append(link("Kaynağında oku ↗", row.url));
+  const local = node("a", "Arşivde oku");
+  local.href = "/arsiv/oku/-" + row.revision;
+  item.append(
+    local,
+    document.createTextNode(" · "),
+    link("Kaynağında oku ↗", row.url),
+  );
   if (row.versions > 1) {
     const history = node("details");
     history.append(node("summary", "Arşivdeki önceki kayıtlar"));
@@ -94,6 +100,9 @@ function article(row) {
             node("br"),
             node("span", r.excerpt_tr || r.excerpt),
           );
+          const archived = node("a", "Bu kaydı aç");
+          archived.href = "/arsiv/oku/-" + r.revision;
+          box.append(node("br"), archived);
           history.append(box);
         }
       } catch {

@@ -33,6 +33,24 @@
         </div>
         <button class="refresh" id="reload">Yenile</button>
       </div>
+      <form action="/arama" role="search" class="news-query">
+        <label for="press-q">Haber metninde ara</label>
+        <div>
+          <input
+            id="press-q"
+            name="q"
+            type="search"
+            maxlength="180"
+            placeholder="Kelime veya PostgreSQL terimi"
+            required
+          /><input type="hidden" name="alan" value="press" /><button
+            class="refresh"
+            type="submit"
+          >
+            Ara
+          </button>
+        </div>
+      </form>
       <div class="press-layout">
         <section aria-label="Dış kaynak haber arşivi">
           <div class="press-filters">

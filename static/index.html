@@ -10,6 +10,7 @@
     />
     <link rel="icon" href="/static/elephant.png" />
     <link rel="stylesheet" href="/static/app.css" />
+    <link rel="stylesheet" href="/static/press.css" />
     <script src="/static/app.js" defer></script>
   </head>
   <body>
@@ -41,6 +42,19 @@
           <i data-icon="refresh"></i><span>Yenile</span>
         </button>
       </div>
+      <form action="/arama" role="search" class="news-query">
+        <label for="news-q">Haber arşivinde ara</label>
+        <div>
+          <input
+            id="news-q"
+            name="q"
+            type="search"
+            maxlength="180"
+            required
+            placeholder="Kelime, CVE numarası veya sürüm"
+          /><button class="refresh" type="submit">Ara</button>
+        </div>
+      </form>
       <div id="health" role="status" hidden></div>
       <section id="notice" class="notice" hidden aria-live="polite"></section>
       <div class="layout">

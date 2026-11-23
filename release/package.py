@@ -49,7 +49,7 @@ def package(arch, engine, model, output):
         nested.getmember(f"{ENGINE_PREFIX}/LICENSE")
 
     required = (
-        "README.md", "install.sh", "app.py", "admin.py", "VERSION", "feeds.py", "community.py", "archive.py", "turkish.json",
+        "README.md", "install.sh", "app.py", "admin.py", "VERSION", "feeds.py", "community.py", "news_search.py", "templates/archive-search.html", "archive.py", "turkish.json",
         "requirements.txt", "static/index.html", "deploy/tunel-koprusu.sh",
         "deploy/postgres-gundem.service", "deploy/postgres-gundem-model.service",
         "deploy/postgres-gundem-arsiv.service", "deploy/postgres-gundem-arsiv.timer",

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ doc.title if doc else "Haber arama" }} · Postgres Gündem</title>
+<link rel="icon" href="/static/elephant.png"><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/press.css"></head>
+<body><header class="mast"><div class="shell mast-inner"><a class="brand" href="/"><img src="/static/elephant.png" alt="" width="37" height="38"><span>Postgres<span class="brand-light">Gündem</span></span></a><nav aria-label="Ana menü"><a href="/">Bülten</a><a href="/dis-basin">Dış basın</a><a href="/arama" class="active">Arama</a><a href="/ayarlar">Ayarlar</a></nav></div></header>
+<main class="shell press archive-search">
+{% if doc %}
+  <p><a href="{{ url_for('search',q=q,alan=kind,sayfa=page) }}">← Aramaya dön</a></p>
+  <article class="card"><div class="byline">{{ kinds[doc.kind] }} · {{ doc.source }} · {{ doc.date }}</div><h1>{{ doc.title }}</h1>
+  {% for paragraph in doc.translated %}<p>{{ paragraph }}</p>{% endfor %}
+  {% if doc.partial %}<p class="byline">Metnin tamamının Türkçe çevirisi henüz hazır değil.</p>{% endif %}
+  {% if doc.original or doc.original_title != doc.title %}
+  <details {% if not doc.translated %}open{% endif %}><summary>Arşivdeki özgün metin</summary><div lang="{{ doc.lang }}"><strong>{{ doc.original_title }}</strong>{% for paragraph in doc.original %}<p>{{ paragraph }}</p>{% endfor %}</div></details>
+  {% endif %}
+  <a href="{{ doc.link }}" target="_blank" rel="noopener noreferrer">Yayıncının sayfasını aç ↗</a></article>
+{% else %}
+  <div class="page-heading"><h1>Haber ara<span>.</span></h1></div>
+  <form action="/arama" method="get" role="search" class="news-query">
+    <label for="q">Haber metninde ara</label>
+    <div><input id="q" name="q" type="search" maxlength="180" value="{{ q }}" placeholder="Kelime, CVE, sürüm veya PostgreSQL terimi"><select name="alan" aria-label="Arama alanı"><option value="">Tüm haberler</option>{% for value,label in kinds.items() %}<option value="{{ value }}" {% if kind==value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select><button type="submit" class="refresh">Ara</button></div>
+  </form>
+  {% if pending %}<p class="byline" role="status">Yeni kayıtlar arama dizinine ekleniyor.</p>{% endif %}
+  {% if q %}
+    <p role="status">{{ total }} haber bulundu.</p>
+    {% if rows %}<div class="card">{% for row in rows %}
+      <article><div class="byline">{{ row.kind }} · {{ row.source }} · {{ row.date }}</div>
+      <h2><a href="{{ url_for('archived',record=row.doc,q=q,alan=kind,sayfa=page) }}">{{ row.title }}</a></h2>
+      <p>{{ row.snippet[0] }}{% if row.snippet[1] %}<mark>{{ row.snippet[1] }}</mark>{% endif %}{{ row.snippet[2] }}</p></article>
+    {% endfor %}</div>{% endif %}
+    <nav class="press-pages" aria-label="Sonuç sayfaları">{% if page>1 %}<a href="{{ url_for('search',q=q,alan=kind,sayfa=page-1) }}">← Önceki</a>{% endif %}{% if total>page*15 %}<a href="{{ url_for('search',q=q,alan=kind,sayfa=page+1) }}">Sonraki →</a>{% endif %}</nav>
+  {% endif %}
+{% endif %}</main></body></html>

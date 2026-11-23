@@ -6,6 +6,8 @@ PostgreSQL’in güvenlik duyurularını, etkilenen ve düzeltilen sürümleri, 
 
 Başlangıç kaynakları arasında Crunchy Data, CYBERTEC, CloudNativePG, Dalibo, PostgreSQL Europe, JPUG, ITPUG, PostgreSQL Türkiye ve Fransızca Planète ağı bulunur. Yerel model başlığı ve akış özetini kaynak dilinden Türkçeye çevirir. Kaynağın sağladığı özgün metin, yayın adresi ve sonraki değişiklikler SQLite’ta kalır. Çeviri hazırlanırken veya teknik doğrulama başarısız olduğunda özgün metne erişilebilir. Haber akışında yalnız başlık varsa panel yalnız başlığı sunar. [Crunchy Data](https://www.crunchydata.com/blog) · [Planète PostgreSQL](https://www.postgresql.fr/planete) · [JPUG](https://www.postgresql.jp/)
 
+**Haber arama** kutusuna bir kelime, sürüm, CVE numarası veya SQL tanımlayıcısı yazın. Bülten ve dış basın kayıtları, eski sürümleri, özgün metinleri ve yerel Türkçe çevirileriyle aranır. Arama eşleşen bölümü gösterir ve o tarihte kaydedilen yerel makaleyi açar. Model başlık ve özetlerden sonra akışların sağladığı uzun metinleri parça parça çevirir. Yeni çeviriler hazır oldukça arama dizinine girer. Yalnız başlık sunan yayınlar için arşivde başlık ve kaynak bağlantısı bulunur.
+
 **Haberlerin zaman aşımı yoktur.** Aylık arşivler kendiliğinden silinmez. İkinci diske taşıma aracı hedefteki kopyanın SHA-256 özetini, gzip bütünlüğünü ve SQLite veritabanını doğrular. [Eski uygulamayı durdurma, verileri koruyarak kurma ve diskte yer açma](deploy/depolama.md)
 
 ## Hetzner’de Docker ile temiz kurulum
@@ -14,14 +16,14 @@ Varsayılan çevirmen TranslateGemma 4B Q4_K_M, 40 DBA cümlesinin 38'inde tekni
 
 Linux ARM64 veya x86-64, Docker Engine ve Compose v2 gerekir. Kurucu sunucudaki Bash, Python 3.9+, OpenSSL 3, curl ve tar araçlarını kullanır. Model sunucunun işlemcisiyle çalışır. Ağırlıkları bellek eşleme ile açar ve bir seferde bir metin çevirir. Model ve SQLite yeni sürümlerde de aynı sunucu klasörlerinde kalır.
 
-Root olarak aşağıdaki komutları çalıştırın. Adımlar dış basın arşivini içeren v1.1.0 sürümüne sabitlenmiştir. İndirdiğiniz kurulum paketinin özetini sürüm sayfasındaki değerle de karşılaştırabilirsiniz. [Kararlı sürüm](https://github.com/EnezMutluoglu/postgres-gundem/releases/tag/v1.1.0)
+Root olarak aşağıdaki komutları çalıştırın. Adımlar dış basın arşivini içeren v1.1.1 sürümüne sabitlenmiştir. İndirdiğiniz kurulum paketinin özetini sürüm sayfasındaki değerle de karşılaştırabilirsiniz. [Kararlı sürüm](https://github.com/EnezMutluoglu/postgres-gundem/releases/tag/v1.1.1)
 
 ```bash
 set -e
 cd /root
 mkdir -p postgres-gundem-kurulum
 cd postgres-gundem-kurulum
-url=https://github.com/EnezMutluoglu/postgres-gundem/releases/download/v1.1.0
+url=https://github.com/EnezMutluoglu/postgres-gundem/releases/download/v1.1.1
 curl -fLO "$url/kurulum.tar.gz"
 curl -fLO "$url/kurulum.tar.gz.sha256"
 sha256sum -c kurulum.tar.gz.sha256

@@ -21,6 +21,7 @@ from admin import register
 
 import feeds
 import community
+import news_search
 
 ROOT = Path(__file__).resolve().parent
 DATA = Path(os.environ.get("GUNDEM_DATA", ROOT / ".data"))
@@ -70,6 +71,7 @@ def initialize():
           CREATE TABLE IF NOT EXISTS sources(name TEXT PRIMARY KEY, success TEXT, error TEXT);
         """)
         community.setup(con)
+        news_search.setup(con)
         # Apply the same checks to translations produced by earlier releases.
         stale = [
             (original, translation)
@@ -749,13 +751,14 @@ def no_stale_alerts(response):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'"
+        "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
     )
     return response
 
 
 register(app, DATA, MODEL, db, pending_count)
 community.register(app, db)
+news_search.register(app, db, EDITORIAL)
 
 
 @app.get("/dis-basin")
@@ -785,6 +788,7 @@ if __name__ == "__main__":
     )
     initialize()
     workers = [hourly, translate_pending]
+    workers.append(lambda: news_search.index(db, EDITORIAL))
     workers.extend(
         [
             lambda: community.weekly(db),

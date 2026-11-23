@@ -116,6 +116,9 @@ CREATE TABLE IF NOT EXISTS press_revisions(id INTEGER PRIMARY KEY, article INTEG
 CREATE INDEX IF NOT EXISTS press_queue ON press_revisions(retry,id) WHERE title_tr IS NULL;
 CREATE INDEX IF NOT EXISTS press_link ON press_revisions(link);
 CREATE INDEX IF NOT EXISTS press_date ON press_revisions(published DESC,id DESC);
+CREATE TABLE IF NOT EXISTS press_chunked(revision INTEGER PRIMARY KEY);
+CREATE TABLE IF NOT EXISTS press_parts(revision INTEGER NOT NULL,pos INTEGER NOT NULL,length INTEGER NOT NULL,translation TEXT,retry INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(revision,pos));
+CREATE INDEX IF NOT EXISTS press_part_queue ON press_parts(retry,revision,pos) WHERE translation IS NULL;
 """
 
 
@@ -511,6 +514,57 @@ def weekly(db):
         time.sleep(300)
 
 
+def translate_fragment(db, translate, ts):
+    with db() as con:
+        part = con.execute(
+            """SELECT p.revision,p.pos,substr(r.original,p.pos+1,p.length) AS source,r.lang
+          FROM press_parts p JOIN press_revisions r ON r.id=p.revision WHERE p.translation IS NULL AND p.retry<=?
+          ORDER BY p.retry,p.revision,p.pos LIMIT 1""",
+            (ts,),
+        ).fetchone()
+        if not part:
+            row = con.execute("""SELECT id,original FROM press_revisions r WHERE lang NOT LIKE 'tr%' AND original!=''
+                AND original!=excerpt AND NOT EXISTS(SELECT 1 FROM press_chunked c WHERE c.revision=r.id)
+                ORDER BY id DESC LIMIT 1""").fetchone()
+            if not row:
+                return False
+            pos = 0
+            original = row["original"]
+            while pos < len(original):
+                chunk = original[pos : pos + 620]
+                if pos + len(chunk) < len(original):
+                    cut = list(re.finditer(r"[.!?。！？](?:\s|$)|\s", chunk))
+                    if cut:
+                        chunk = chunk[: cut[-1].end()]
+                con.execute(
+                    "INSERT OR IGNORE INTO press_parts(revision,pos,length) VALUES(?,?,?)",
+                    (row["id"], pos, len(chunk)),
+                )
+                pos += len(chunk)
+            con.execute("INSERT OR IGNORE INTO press_chunked VALUES(?)", (row["id"],))
+            return True
+    try:
+        result = (
+            translate(part["source"].strip(), part["lang"])
+            if part["source"].strip()
+            else ""
+        )
+        with db() as con:
+            con.execute(
+                "UPDATE press_parts SET translation=? WHERE revision=? AND pos=?",
+                (result, part["revision"], part["pos"]),
+            )
+    except Exception as exc:
+        with db() as con:
+            con.execute(
+                "UPDATE press_parts SET retry=? WHERE revision=? AND pos=?",
+                (ts + 3600, part["revision"], part["pos"]),
+            )
+        if not isinstance(exc, ValueError):
+            time.sleep(20)
+    return True
+
+
 def translate_one(db, translate):
     ts = int(time.time())
     with db() as con:
@@ -520,7 +574,7 @@ def translate_one(db, translate):
             (ts,),
         ).fetchone()
     if not row:
-        return False
+        return translate_fragment(db, translate, ts)
     try:
         title = translate(row["title"], row["lang"])
         summary = translate(row["excerpt"], row["lang"]) if row["excerpt"] else ""
@@ -573,7 +627,7 @@ def register(app, db):
                 0
             ]
             rows = con.execute(
-                """SELECT a.id,a.url,a.host,r.lang,r.title,r.title_tr,r.excerpt,r.excerpt_tr,r.published,r.observed,r.error,r.origin
+                """SELECT a.id,a.url,a.host,r.id AS revision,r.lang,r.title,r.title_tr,r.excerpt,r.excerpt_tr,r.published,r.observed,r.error,r.origin
                 ,(SELECT count(*) FROM press_revisions v WHERE v.article=a.id) AS versions
                 """
                 + joined
@@ -620,7 +674,7 @@ def register(app, db):
     def history(article):
         with db() as con:
             rows = con.execute(
-                """SELECT r.title,r.excerpt,r.title_tr,r.excerpt_tr,r.observed,r.lang FROM press_revisions r
+                """SELECT r.id AS revision,r.title,r.excerpt,r.title_tr,r.excerpt_tr,r.observed,r.lang FROM press_revisions r
               JOIN press_articles a ON a.id=r.article WHERE a.id=? AND a.current_revision!=r.id ORDER BY r.id DESC""",
                 (article,),
             ).fetchall()

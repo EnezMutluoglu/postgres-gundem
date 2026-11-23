@@ -1,1 +1,1 @@
-Dış basın sekmesi, 18 dil ve bölge aramasında haftalık kaynak keşfi, yerelde çok dilli Türkçe çeviri, kalıcı haber geçmişi ve doğrulanmış diskler arası arşiv taşıma. Mevcut TranslateGemma modeli kullanılmaya devam eder.
+Haber araması bülten ve dış basın kayıtlarının başlıklarını, gövdesini, Türkçe çevirilerini ve önceki sürümlerini tarar. Eşleşen bölümden yerel makaleye erişilebilir. Aynı yerel model uzun akış metinlerini de çevirir. Mevcut arşivler ve model korunur.
