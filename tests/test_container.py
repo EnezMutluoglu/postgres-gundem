@@ -178,6 +178,43 @@ class SwitchTests(unittest.TestCase):
             self.assertEqual(db.execute("select id from items").fetchone(), ("old",))
         self.assertFalse(self.m.tx.exists())
 
+    def test_watch_stays_offline_until_an_admin_requests_a_release_check(self):
+        queue = self.base / "requests"
+        queue.mkdir()
+        (
+            queue / "check"
+        ).touch()  # Only directory requests created by the admin endpoint are valid.
+        with (
+            patch.object(self.m, "check", return_value=self.new) as check,
+            patch.object(self.m, "apply") as apply,
+            patch.object(
+                self.module.time, "monotonic", side_effect=range(0, 86400, 7200)
+            ),
+            patch.object(
+                self.module.time, "sleep", side_effect=[None, None, KeyboardInterrupt]
+            ),
+            self.assertRaises(KeyboardInterrupt),
+        ):
+            self.m.watch()
+        check.assert_not_called()
+        apply.assert_not_called()
+
+        for name in ("check", "apply-" + self.new["tag"]):
+            (queue / name).mkdir()
+            with (
+                patch.object(self.m, "check", return_value=self.new) as check,
+                patch.object(self.m, "apply") as apply,
+                patch.object(self.module.time, "sleep", side_effect=KeyboardInterrupt),
+                self.assertRaises(KeyboardInterrupt),
+            ):
+                self.m.watch()
+            check.assert_called_once_with()
+            if name == "check":
+                apply.assert_not_called()
+            else:
+                apply.assert_called_once_with(self.new)
+            self.assertFalse((queue / name).exists())
+
     def test_interrupted_switch_recovers_twice(self):
         self.m.snapshot()
         self.module.save(self.m.tx, dict(phase="switch", old=self.old, new=self.new))

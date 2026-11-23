@@ -112,7 +112,7 @@ def register(web, data, model, database, pending_count):
         try:
             return json.loads((control / "status/status.json").read_text())
         except (OSError, ValueError):
-            return dict(message="Güncelleme hizmetinin ilk denetimi bekleniyor.")
+            return dict(message="Sürüm bilgisi için Şimdi denetle’ye basın.")
 
     @web.get("/api/admin/status")
     def status():

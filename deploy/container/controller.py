@@ -467,7 +467,6 @@ class Manager:
             raise
 
     def watch(self):
-        next_check = 0
         while True:
             try:
                 self.recover()
@@ -481,16 +480,14 @@ class Manager:
                     ),
                     None,
                 )
-                if command:
+                if command is not None:
                     if command.is_symlink() or not command.is_dir():
                         command.unlink()
                     else:
                         command.rmdir()
-                if command or time.monotonic() >= next_check:
-                    next_check = time.monotonic() + 3600
-                    new = self.check()
-                    if command and command.name == "apply-" + new["tag"]:
-                        self.apply(new)
+                        new = self.check()
+                        if command.name == "apply-" + new["tag"]:
+                            self.apply(new)
             except Exception as exc:
                 logging.warning("Güncelleme: %s", exc)
                 self.message(

@@ -7,17 +7,20 @@ docker compose version >/dev/null
 
 tag=v1.1.3
 export PG_ROOT=/srv/postgres-gundem
+mode=${1:-kur}
+[[ $mode == kur || $mode == --sadece-guncelleyici ]] || { echo 'Kullanım: bash postgres-gundem-kur.sh [--sadece-guncelleyici]' >&2; exit 1; }
+dir=/root/postgres-gundem-kurulum/$tag/manuel
+mkdir -p "$dir"
+cd "$dir"
+curl --fail --location --retry 3 --proto '=https' \
+  "https://github.com/EnezMutluoglu/postgres-gundem/releases/download/$tag/kurulum-manuel.tar.gz" -o kurulum.tar.gz
+echo '026094002a2ce6e344c9583db6295623949f1e068b526a5b9b6b673a05c32006  kurulum.tar.gz' | sha256sum -c -
+tar -xzf kurulum.tar.gz
+cd container
+
 install_panel() {
-  local dir=/root/postgres-gundem-kurulum/$tag
   local model file unit digest
   local -a args=() legacy=() active=()
-  mkdir -p "$dir"
-  cd "$dir"
-  curl --fail --location --retry 3 --proto '=https' \
-    "https://github.com/EnezMutluoglu/postgres-gundem/releases/download/$tag/kurulum.tar.gz" -o kurulum.tar.gz
-  echo '4287553a9a8569093776716223a5a99252e9cd9c3d8b658e475d648f9c4f0c13  kurulum.tar.gz' | sha256sum -c -
-  tar -xzf kurulum.tar.gz
-  cd container
 
   model=$(python3 -c 'import json; print(json.load(open("model.json"))["file"])')
   digest=$(python3 -c 'import json; print(json.load(open("model.json"))["sha256"])')
@@ -48,8 +51,34 @@ install_panel() {
 
 if [[ -s $PG_ROOT/manager/active.json ]] &&
    [[ $(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' postgres-gundem-web-1 2>/dev/null) == "$PG_ROOT" ]]; then
+  updater=postgres-gundem-updater
+  target=$PG_ROOT/controller/controller.py
+  [[ $(docker inspect -f '{{index .Config.Labels "net.postgres-gundem.root"}}' "$updater") == "$PG_ROOT" ]]
+  if ! cmp -s controller.py "$target" || [[ $mode == --sadece-guncelleyici ]]; then
+    current=$(sha256sum "$target")
+    case "${current%% *}" in
+      ec3066fef8dffe275a71ed54c55a407515f6493c249c2dd15cbb261c58381c1a|a281874372c0304d1f49465d0c1f7d26ff1376fd5ac5f3173fdd2aeaacde1334) ;;
+      *) cmp -s controller.py "$target" || { echo 'Kurulu güncelleyici farklı bir sürüme ait.' >&2; exit 1; } ;;
+    esac
+    python3 - "$PG_ROOT" <<'PY'
+import json, sys
+from pathlib import Path
+base = Path(sys.argv[1])
+status = base / "status/status.json"
+if (base / "manager/transaction.json").exists() or (status.is_file() and json.loads(status.read_text()).get("busy")):
+    raise SystemExit("Devam eden sürüm işlemi bittiğinde komutu yeniden çalıştırın.")
+PY
+    tmp=$(mktemp "$PG_ROOT/controller/.controller.XXXXXXXX")
+    trap 'rm -f -- "$tmp"' EXIT
+    install -m 644 controller.py "$tmp"
+    mv -fT -- "$tmp" "$target"
+    docker restart "$updater" >/dev/null
+  fi
+  echo 'Panel sürümü artık yönetici isteğiyle denetlenir.'
+  if [[ $mode == --sadece-guncelleyici ]]; then exit 0; fi
   docker start postgres-gundem-model-1 postgres-gundem-web-1 postgres-gundem-updater >/dev/null
 else
+  if [[ $mode == --sadece-guncelleyici ]]; then echo 'Kurulu Docker paneli bulunamadı. İlk kurulum için betiği parametresiz çalıştırın.' >&2; exit 1; fi
   install_panel
 fi
 
