@@ -80,6 +80,8 @@ du -sh /srv/postgres-gundem/{data,arsiv,models,manager}
 | `manager/` | Etkin ve önceki sürüm, geri dönüş kopyası, kesintiye karşı işlem kaydı |
 | `config/` | Yönetici parolasının özeti ve oturum anahtarı |
 
+40 GB disk için en büyük sabit kalem 2,32 GiB'lik modeldir. v1.0.0 ARM64 imaj arşivi 83 MiB, x86-64 imaj arşivi 93 MiB indirir. Konteyner motoru açılmış katmanları ayrıca saklar. Kaynak denetimi aynı haber değişmedikçe yeni kayıt yazmaz. Yeni haberler ve çeviriler canlı SQLite veritabanına eklenir. Üç aylık saklama kuralı sıkıştırılmış kopyalar için geçerlidir. Örnek bir ilk kurulumda veri dizini 268 KiB, arşiv dizini 44 KiB tuttu. Gerçek büyümeyi yukarıdaki `du` komutuyla izleyebilirsiniz. Yerel kurulum paketini de sunucuda tutarsanız modelin ikinci kopyası 2,32 GiB daha kullanır.
+
 Güncellemede önce imaj ve model doğrulanır. Panel kısa süre durdurulur, SQLite’ın tutarlı kopyası alınır ve yeni sürüm başlatılır. Sağlık kontrolü başarısızsa önceki imajla ilişkili veritabanı geri yüklenir. Başarılı bir geçişi daha sonra elle geri aldığınızda veriler önceki geçiş anına döner.
 
 Docker kurulumunda gerektiğinde SSH üzerinden önceki sürüme dönün.
