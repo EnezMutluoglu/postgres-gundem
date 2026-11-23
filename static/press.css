@@ -1,0 +1,100 @@
+.press {
+  padding-bottom: 3rem;
+}
+.press-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2.2fr) minmax(240px, 1fr);
+  gap: 2rem;
+  align-items: start;
+}
+.press-filters,
+.press-pages {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.press select,
+.press input {
+  max-width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: white;
+  color: var(--ink);
+  font: inherit;
+}
+.press-filters label,
+.press-info label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+.press article {
+  padding: 1.2rem 1.4rem;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.press article:last-child {
+  border: 0;
+}
+.press h2 {
+  font-size: 1.2rem;
+  margin: 0.35rem 0;
+  line-height: 1.35;
+}
+.press article p {
+  margin: 0.5rem 0;
+}
+.press .byline,
+.press-info p,
+.press-pages span {
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+.press .byline {
+  color: var(--teal);
+  font-weight: 600;
+}
+.press-pages {
+  justify-content: space-between;
+  margin: 1.2rem 0;
+}
+.press-info {
+  padding: 1.3rem;
+}
+.press-info input,
+.press-info select {
+  width: 100%;
+  margin: 0.4rem 0;
+}
+#sources {
+  max-height: 22rem;
+  overflow: auto;
+}
+#sources div {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.press article details {
+  padding-left: 0.7rem;
+  border-left: 2px solid var(--line);
+}
+@media (max-width: 730px) {
+  .press-layout {
+    grid-template-columns: 1fr;
+    gap: 0.6rem;
+  }
+  .press-filters label {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .press article {
+    padding: 1rem;
+  }
+  .press .page-heading {
+    margin-top: 1.5rem;
+  }
+}

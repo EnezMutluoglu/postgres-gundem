@@ -69,7 +69,7 @@ base,engine,less,uid,gid,units,system=sys.argv[1:]
 p=pathlib.Path(base)
 (p/'settings.json').write_text(json.dumps(dict(engine=engine,rootless=less=='true',uid=int(uid),gid=int(gid),quadlets=units,platform=system)))
 PY
-install -m 700 admin-password.py "$base/controller/"
+install -m 700 admin-password.py arsiv-tasi.py "$base/controller/"
 if [[ ! -s $base/config/admin.json ]]; then python3 "$base/controller/admin-password.py"; fi
 if ! "$engine" network inspect postgres-gundem-origin >/dev/null 2>&1; then "$engine" network create postgres-gundem-origin >/dev/null; fi
 if [[ $engine == podman ]] && ! podman network exists postgres-gundem-private; then podman network create --internal postgres-gundem-private; fi

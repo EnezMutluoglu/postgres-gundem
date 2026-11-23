@@ -1,1 +1,1 @@
-İlk konteyner sürümü. PostgreSQL bülteni yerel Türkçe çeviriyle sunulur. Yönetici ekranından sağlık durumunu, arşivleri ve imzalı sürümleri takip edebilirsiniz. Docker Compose ve Podman Quadlet kurulumları ARM64 ve x86-64 mimarilerini destekler.
+Dış basın sekmesi, 18 dil ve bölge aramasında haftalık kaynak keşfi, yerelde çok dilli Türkçe çeviri, kalıcı haber geçmişi ve doğrulanmış diskler arası arşiv taşıma. Mevcut TranslateGemma modeli kullanılmaya devam eder.

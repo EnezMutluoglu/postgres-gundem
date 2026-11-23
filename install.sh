@@ -120,7 +120,7 @@ elif [[ "$(cat "$root/llama/release" 2>/dev/null || true)" != "$release" ]] || !
   printf '%s\n' "$release" >"$root/llama/release"
 fi
 
-install -m 644 app.py admin.py feeds.py archive.py turkish.json requirements.txt VERSION "$root/"
+install -m 644 app.py admin.py feeds.py community.py archive.py turkish.json requirements.txt VERSION "$root/"
 if [[ -f deploy/tunel-koprusu.sh ]]; then install -m 755 deploy/tunel-koprusu.sh "$root/tunel-koprusu.sh"; fi
 if [[ -d licenses ]]; then
   install -d -m 755 "$root/licenses"
@@ -133,7 +133,7 @@ chown -R root:root "$root/static" "$root/llama"
 chmod 755 "$root/static" "$root/static/fonts"
 python3 -m venv "$root/venv"
 pip_options=()
-if [[ $arch == aarch64 || -n $bundled_engine ]]; then pip_options=(--only-binary=:all: --no-cache-dir); fi
+if [[ $arch == aarch64 || -n $bundled_engine ]]; then pip_options=(--only-binary=:all: --no-binary=langdetect --no-cache-dir); fi
 "$root/venv/bin/python" -m pip --disable-pip-version-check install "${pip_options[@]}" -r "$root/requirements.txt"
 install -m 644 deploy/*.service deploy/*.timer /etc/systemd/system/
 systemctl daemon-reload

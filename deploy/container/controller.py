@@ -343,6 +343,33 @@ class Manager:
             os.fsync(f.fileno())
 
     def restore(self, snapshot):
+        # Both services are stopped. Preserve the outgoing SQLite files even if a
+        # failed candidate left an unreadable database that cannot be backed up.
+        if self.db.is_file():
+            shelf = self.private / "geri-donus"
+            shelf.mkdir(mode=0o700, exist_ok=True)
+            saved = Path(
+                tempfile.mkdtemp(
+                    prefix=datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ-"),
+                    dir=shelf,
+                )
+            )
+            for suffix in ("", "-wal", "-journal"):
+                src = self.db.with_name(self.db.name + suffix)
+                if src.is_file() and not src.is_symlink():
+                    dst = saved / src.name
+                    try:
+                        os.link(src, dst)
+                    except OSError:
+                        shutil.copyfile(src, dst)
+                    with dst.open("rb") as archive:
+                        os.fsync(archive.fileno())
+            for directory in (saved, shelf, self.private):
+                fd = os.open(directory, os.O_RDONLY)
+                try:
+                    os.fsync(fd)
+                finally:
+                    os.close(fd)
         with tempfile.NamedTemporaryFile(dir=self.db.parent, delete=False) as f:
             tmp = Path(f.name)
             try:

@@ -2,20 +2,26 @@
 
 PostgreSQL’in güvenlik duyurularını, etkilenen ve düzeltilen sürümleri, geliştirme notlarını ve eklentileri Türkçe gösteren tek sayfalık bülten. Haber kaynakları saatte bir kontrol edilir. Etkilenen sürüm ve yama bilgisi PostgreSQL’in yayımladığı kayıtlardan okunur. Ağ bağlantısı kesildiğinde son bülten okunabilir.
 
+**Dış basın** sekmesi yayıncı, özgün dil ve tarihle birlikte topluluk haberlerini gösterir. İlk açılışta ve ardından yedi günde bir doğrudan yayın akışları, PostgreSQL topluluğunun iki kaynak dizini, Planet ve 18 bölgesel Google Haberler araması taranır. Her görevin zamanı SQLite’a kaydedilir. Başarısız olan görev bir saat sonra yeniden denenir. Arama sonuçlarındaki yeni yayıncılar aday listesine girer. Haber yayımlamak için yayıncının bilinen kaynaklar veya topluluk dizinleriyle eşleşmesi gerekir. Dizinlerden çıkan yayıncılar için üç haftalık doğrulama süresi vardır. [Planet kaynak dizini](https://planet.postgresql.org/feeds.html) · [Uluslararası topluluklar](https://www.postgresql.org/community/international/)
+
+Başlangıç kaynakları arasında Crunchy Data, CYBERTEC, CloudNativePG, Dalibo, PostgreSQL Europe, JPUG, ITPUG, PostgreSQL Türkiye ve Fransızca Planète ağı bulunur. Yerel model başlığı ve akış özetini kaynak dilinden Türkçeye çevirir. Kaynağın sağladığı özgün metin, yayın adresi ve sonraki değişiklikler SQLite’ta kalır. Çeviri hazırlanırken veya teknik doğrulama başarısız olduğunda özgün metne erişilebilir. Haber akışında yalnız başlık varsa panel yalnız başlığı sunar. [Crunchy Data](https://www.crunchydata.com/blog) · [Planète PostgreSQL](https://www.postgresql.fr/planete) · [JPUG](https://www.postgresql.jp/)
+
+**Haberlerin zaman aşımı yoktur.** Aylık arşivler kendiliğinden silinmez. İkinci diske taşıma aracı hedefteki kopyanın SHA-256 özetini, gzip bütünlüğünü ve SQLite veritabanını doğrular. [Eski uygulamayı durdurma, verileri koruyarak kurma ve diskte yer açma](deploy/depolama.md)
+
 ## Hetzner’de Docker ile temiz kurulum
 
 Varsayılan çevirmen TranslateGemma 4B Q4_K_M, 40 DBA cümlesinin 38'inde teknik ve dil denetimlerini geçti. Önceki Riva modeli aynı denetimlerin 28'ini geçti. [Örnek çeviriler ve 4B modellerin bellek ayarları](release/translation-report.md)
 
 Linux ARM64 veya x86-64, Docker Engine ve Compose v2 gerekir. Kurucu sunucudaki Bash, Python 3.9+, OpenSSL 3, curl ve tar araçlarını kullanır. Model sunucunun işlemcisiyle çalışır. Ağırlıkları bellek eşleme ile açar ve bir seferde bir metin çevirir. Model ve SQLite yeni sürümlerde de aynı sunucu klasörlerinde kalır.
 
-Root olarak aşağıdaki komutları çalıştırın. Adımlar ilk kararlı sürüme sabitlenmiştir. İndirdiğiniz kurulum paketinin özetini sürüm sayfasındaki değerle de karşılaştırabilirsiniz. [Kararlı sürüm](https://github.com/EnezMutluoglu/postgres-gundem/releases/tag/v1.0.0)
+Root olarak aşağıdaki komutları çalıştırın. Adımlar dış basın arşivini içeren v1.1.0 sürümüne sabitlenmiştir. İndirdiğiniz kurulum paketinin özetini sürüm sayfasındaki değerle de karşılaştırabilirsiniz. [Kararlı sürüm](https://github.com/EnezMutluoglu/postgres-gundem/releases/tag/v1.1.0)
 
 ```bash
 set -e
 cd /root
 mkdir -p postgres-gundem-kurulum
 cd postgres-gundem-kurulum
-url=https://github.com/EnezMutluoglu/postgres-gundem/releases/download/v1.0.0
+url=https://github.com/EnezMutluoglu/postgres-gundem/releases/download/v1.1.0
 curl -fLO "$url/kurulum.tar.gz"
 curl -fLO "$url/kurulum.tar.gz.sha256"
 sha256sum -c kurulum.tar.gz.sha256
@@ -35,7 +41,7 @@ Eski uygulama ve haberler sırasıyla `/opt/postgres-gundem` ve `/var/lib/postgr
 
 ### Modeli dosyadan kurma
 
-Çevrimdışı model kurulumu için sürüm sayfasındaki `model.gguf.part-00`, `model.gguf.part-01` ve `model-parts.sha256` dosyalarını aynı klasöre aktarın. Bu klasörde `sha256sum -c model-parts.sha256` çalıştırın. Kurulum dizininde `bash get-model.sh /root/model-parcalari` parçaları birleştirip modelin tamamını doğrular. Model Google TranslateGemma'nın GGUF uyarlamasıdır. [Model, dönüştürme bilgisi ve lisans](https://huggingface.co/Menterium/translategemma-4b-it-GGUF/tree/d1709f49e90452b9189e0144cc6826d199616921)
+Çevrimdışı model kurulumu için [v1.0.0 model paketindeki](https://github.com/EnezMutluoglu/postgres-gundem/releases/tag/v1.0.0) `model.gguf.part-00`, `model.gguf.part-01` ve `model-parts.sha256` dosyalarını aynı klasöre aktarın. Bu klasörde `sha256sum -c model-parts.sha256` çalıştırın. Kurulum dizininde `bash get-model.sh /root/model-parcalari` parçaları birleştirip modelin tamamını doğrular. Model Google TranslateGemma'nın GGUF uyarlamasıdır. [Model, dönüştürme bilgisi ve lisans](https://huggingface.co/Menterium/translategemma-4b-it-GGUF/tree/d1709f49e90452b9189e0144cc6826d199616921)
 
 ### Cloudflare Tunnel
 
@@ -75,12 +81,12 @@ du -sh /srv/postgres-gundem/{data,arsiv,models,manager}
 | Sunucu klasörü | İçerik |
 | --- | --- |
 | `data/` | SQLite veritabanı ve WAL dosyaları |
-| `arsiv/` | Ayın ilk günü 03.15 UTC sonrasında alınan sıkıştırılmış arşivler, son üç ay |
+| `arsiv/` | Ayın ilk günü 03.15 UTC sonrasında alınan kalıcı sıkıştırılmış arşivler |
 | `models/` | Salt okunur yerel model ağırlıkları |
 | `manager/` | Etkin ve önceki sürüm, geri dönüş kopyası, kesintiye karşı işlem kaydı |
 | `config/` | Yönetici parolasının özeti ve oturum anahtarı |
 
-40 GB disk için en büyük sabit kalem 2,32 GiB'lik modeldir. v1.0.0 ARM64 imaj arşivi 83 MiB, x86-64 imaj arşivi 93 MiB indirir. Konteyner motoru açılmış katmanları ayrıca saklar. Kaynak denetimi aynı haber değişmedikçe yeni kayıt yazmaz. Yeni haberler ve çeviriler canlı SQLite veritabanına eklenir. Üç aylık saklama kuralı sıkıştırılmış kopyalar için geçerlidir. Örnek bir ilk kurulumda veri dizini 268 KiB, arşiv dizini 44 KiB tuttu. Gerçek büyümeyi yukarıdaki `du` komutuyla izleyebilirsiniz. Yerel kurulum paketini de sunucuda tutarsanız modelin ikinci kopyası 2,32 GiB daha kullanır.
+40 GB disk için en büyük sabit kalem 2,32 GiB'lik modeldir. v1.0.0 ARM64 imaj arşivi 83 MiB, x86-64 imaj arşivi 93 MiB indirir. Konteyner motoru açılmış katmanları ayrıca saklar. Kaynak denetimi aynı haber değişmedikçe yeni kayıt yazmaz. Yeni haberler ve çeviriler canlı SQLite veritabanına eklenir. Her aylık kopya saklanır. Disk doluluğu arttığında eski kopyaları ikinci diske taşıyabilirsiniz. Örnek bir ilk kurulumda veri dizini 268 KiB, arşiv dizini 44 KiB tuttu. Gerçek büyümeyi yukarıdaki `du` komutuyla izleyebilirsiniz. Yerel kurulum paketini de sunucuda tutarsanız modelin ikinci kopyası 2,32 GiB daha kullanır.
 
 Güncellemede önce imaj ve model doğrulanır. Panel kısa süre durdurulur, SQLite’ın tutarlı kopyası alınır ve yeni sürüm başlatılır. Sağlık kontrolü başarısızsa önceki imajla ilişkili veritabanı geri yüklenir. Başarılı bir geçişi daha sonra elle geri aldığınızda veriler önceki geçiş anına döner.
 

@@ -43,6 +43,10 @@ with tempfile.NamedTemporaryFile(dir=dest) as tmp:
 PY
 shopt -s nullglob
 for f in "$legacy"/arsiv/gundem-????-??.sqlite.gz; do
+  if [[ -e $PG_ROOT/arsiv/${f##*/} ]]; then
+    cmp -- "$f" "$PG_ROOT/arsiv/${f##*/}" || { echo 'Aynı aya ait iki farklı arşiv var. İki kopya da korundu.'; exit 1; }
+    continue
+  fi
   install -o 10001 -g 10001 -m 600 "$f" "$PG_ROOT/arsiv/"
 done
 bash install.sh docker

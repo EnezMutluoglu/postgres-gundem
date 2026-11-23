@@ -15,10 +15,12 @@ from urllib.request import Request, urlopen
 
 from flask import Flask, jsonify, request, send_from_directory
 from waitress import serve
+from langdetect import DetectorFactory, LangDetectException, detect_langs
 from archive import archive
 from admin import register
 
 import feeds
+import community
 
 ROOT = Path(__file__).resolve().parent
 DATA = Path(os.environ.get("GUNDEM_DATA", ROOT / ".data"))
@@ -37,6 +39,7 @@ SOURCES = {
 EDITORIAL = json.loads((ROOT / "turkish.json").read_text(encoding="utf-8"))
 app = Flask(__name__)
 work = threading.Event()
+DetectorFactory.seed = 0
 
 
 def now():
@@ -60,10 +63,13 @@ def initialize():
         con.execute("PRAGMA journal_mode=WAL")
         con.executescript("""
           CREATE TABLE IF NOT EXISTS items(id TEXT PRIMARY KEY, source TEXT NOT NULL, data TEXT NOT NULL, seq INTEGER NOT NULL, observed TEXT NOT NULL);
+          CREATE TABLE IF NOT EXISTS item_history(id TEXT NOT NULL,source TEXT NOT NULL,data TEXT NOT NULL,seq INTEGER NOT NULL,observed TEXT NOT NULL,PRIMARY KEY(id,seq));
+          INSERT OR IGNORE INTO item_history SELECT id,source,data,seq,observed FROM items;
           CREATE TABLE IF NOT EXISTS state(key TEXT PRIMARY KEY, value TEXT NOT NULL);
           CREATE TABLE IF NOT EXISTS texts(original TEXT PRIMARY KEY, translation TEXT NOT NULL);
           CREATE TABLE IF NOT EXISTS sources(name TEXT PRIMARY KEY, success TEXT, error TEXT);
         """)
+        community.setup(con)
         # Apply the same checks to translations produced by earlier releases.
         stale = [
             (original, translation)
@@ -91,9 +97,11 @@ def save(source, items):
             if old and old[0] == data:
                 continue
             seq += 1
+            row = (item["id"], source, data, seq, now())
+            con.execute("INSERT INTO item_history VALUES(?,?,?,?,?)", row)
             con.execute(
                 "INSERT OR REPLACE INTO items VALUES(?,?,?,?,?)",
-                (item["id"], source, data, seq, now()),
+                row,
             )
     work.set()
 
@@ -383,15 +391,20 @@ def normalize_terms(original, translation):
     return translation
 
 
-def model_text(original, *, explicit_terms=False, literal=False):
+def model_text(original, *, explicit_terms=False, literal=False, source_lang="en"):
     if os.getenv("GUNDEM_TRANSLATOR") == "gemma":
         glossary = "\n".join(f"{en} = {tr}" for en, tr, _ in glossary_for(original))
-        text = original.replace("<start_of_turn>", "").replace("<end_of_turn>", "")
+        text = re.sub(r"<(?:start_of_turn|end_of_turn|bos|eos)>", "", original)
         instruction = (
             "Translate the following PostgreSQL text from English into Turkish for a "
             "database administrator. Preserve versions, commands, negations and all "
             "conditions. Use only reasons explicitly given. Reply with only the translation."
         )
+        if source_lang != "en":
+            instruction = instruction.replace(
+                "from English",
+                f"from the source language (language code: {source_lang})",
+            )
         if glossary:
             instruction += "\nTerminology:\n" + glossary
         if explicit_terms or literal:
@@ -424,6 +437,8 @@ def model_text(original, *, explicit_terms=False, literal=False):
         if not answer or result.get("stop_type") == "limit" or result.get("truncated"):
             raise ValueError("Eksik çeviri")
         return answer
+    if source_lang != "en":
+        raise ValueError("Çok dilli çeviri için yerel TranslateGemma modeli gerekiyor")
     if os.getenv("GUNDEM_TRANSLATOR") == "opus":
         req = Request(
             MODEL + "/translate",
@@ -540,6 +555,37 @@ def translate(original):
         if len(pieces) > 1:
             return " ".join(translate(p) for p in pieces)
         raise ValueError("Çevirideki gerekçe kaynak cümleyle uyuşmuyor")
+    return result
+
+
+def press_translation(original, language):
+    language = language.split("-")[0]
+    if language == "und":
+        try:
+            language = detect_langs(original)[0].lang
+        except LangDetectException as exc:
+            raise ValueError("Kaynak dili belirlenemedi") from exc
+    if language == "tr":
+        return original
+    if language == "en":
+        result = translate(original)
+        if not safe_instruction(original, result):
+            raise ValueError("Talimatın anlamı doğrulanamadı")
+    else:
+        result = model_text(original, source_lang=language)
+    # Latin identifiers can directly touch Japanese or Chinese characters.
+    tokens = r"(?<![A-Za-z0-9_])(?:CVE-\d{4}-\d+|[0-9]+(?:\.[0-9]+)+|[a-z][a-z0-9]*_[a-z0-9_]+|VACUUM|REINDEX|WAL|SQL|PostgreSQL)(?![A-Za-z0-9_])"
+    if re.findall(tokens, original) != re.findall(tokens, result):
+        raise ValueError("Çevirideki sürüm veya teknik terim doğrulanamadı")
+    if len(original.split()) > 3 and original.casefold() == result.casefold():
+        raise ValueError("Türkçe çeviri bekleniyor")
+    if len(result) >= 50:
+        try:
+            guess = detect_langs(result)[0]
+        except LangDetectException as exc:
+            raise ValueError("Çevirinin dili doğrulanamadı") from exc
+        if guess.lang != "tr" and guess.prob > 0.85:
+            raise ValueError("Türkçe çıktı doğrulanamadı")
     return result
 
 
@@ -709,15 +755,23 @@ def no_stale_alerts(response):
 
 
 register(app, DATA, MODEL, db, pending_count)
+community.register(app, db)
+
+
+@app.get("/dis-basin")
+def press_page():
+    return send_from_directory(app.static_folder, "press.html")
 
 
 def monthly():
     while True:
         instant = datetime.now(timezone.utc)
         month = instant.strftime("%Y-%m")
-        if (instant.day > 1 or (instant.hour, instant.minute) >= (3, 15)) and not (
-            DATA / "arsiv" / f"gundem-{month}.sqlite.gz"
-        ).exists():
+        if (
+            (instant.day > 1 or (instant.hour, instant.minute) >= (3, 15))
+            and not (DATA / "arsiv" / f"gundem-{month}.sqlite.gz").exists()
+            and not (DATA / "arsiv" / f".tasindi-{month}").exists()
+        ):
             try:
                 archive(DATA, month)
             except Exception:
@@ -731,6 +785,12 @@ if __name__ == "__main__":
     )
     initialize()
     workers = [hourly, translate_pending]
+    workers.extend(
+        [
+            lambda: community.weekly(db),
+            lambda: community.translations(db, press_translation),
+        ]
+    )
     if os.getenv("GUNDEM_CONTAINER") == "1":
         workers.append(monthly)
     for fn in workers:

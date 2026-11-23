@@ -1,0 +1,627 @@
+"""Weekly publisher discovery and append-only PostgreSQL community coverage."""
+
+import hashlib
+import json
+import logging
+import re
+import time
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.request import HTTPRedirectHandler, Request, build_opener
+from xml.etree import ElementTree as ET
+
+from bs4 import BeautifulSoup
+from flask import jsonify, request
+from langdetect import LangDetectException, detect_langs
+
+PLANET = "https://planet.postgresql.org/"
+DIRECTORY = PLANET + "feeds.html"
+INTL = "https://www.postgresql.org/community/international/"
+SEARCH = "https://news.google.com/rss/search"
+# lang, publisher, feed, publisher domain (the French feed aggregates several publishers).
+FEEDS = (
+    (
+        "en",
+        "Crunchy Data",
+        "https://www.crunchydata.com/blog/rss.xml",
+        "crunchydata.com",
+    ),
+    (
+        "en",
+        "CYBERTEC",
+        "https://www.cybertec-postgresql.com/en/feed/",
+        "cybertec-postgresql.com",
+    ),
+    (
+        "en",
+        "CloudNativePG",
+        "https://cloudnative-pg.io/blog/index.xml",
+        "cloudnative-pg.io",
+    ),
+    (
+        "en",
+        "PostgreSQL Europe",
+        "https://www.postgresql.eu/feeds/news/",
+        "postgresql.eu",
+    ),
+    ("fr", "Dalibo", "https://blog.dalibo.com/feed.xml", "blog.dalibo.com"),
+    (
+        "fr",
+        "Planète PostgreSQL",
+        "https://postgresqlfr.github.io/planete/feed.atom",
+        "",
+    ),
+    ("ja", "JPUG", "https://www.postgresql.jp/rss.xml", "postgresql.jp"),
+    (
+        "tr",
+        "PostgreSQL Türkiye",
+        "https://postgresql.org.tr/feed/",
+        "postgresql.org.tr",
+    ),
+    ("it", "ITPUG", "https://www.itpug.org/feed.xml", "itpug.org"),
+)
+MARKETS = {
+    "en": "US",
+    "de": "DE",
+    "fr": "FR",
+    "tr": "TR",
+    "it": "IT",
+    "es": "ES",
+    "pt": "BR",
+    "ja": "JP",
+    "ko": "KR",
+    "zh-CN": "CN",
+    "ru": "RU",
+    "pl": "PL",
+    "nl": "NL",
+    "cs": "CZ",
+    "uk": "UA",
+    "id": "ID",
+    "hi": "IN",
+    "ar": "EG",
+}
+NETWORK = {
+    urlsplit(s).netloc
+    for s in [PLANET, DIRECTORY, INTL, SEARCH, *[f[2] for f in FEEDS]]
+}
+WEEK = 7 * 86400
+SHARED_HOSTS = {
+    "github.com",
+    "github.io",
+    "medium.com",
+    "dev.to",
+    "youtube.com",
+    "youtu.be",
+    "linkedin.com",
+    "substack.com",
+    "blogspot.com",
+    "wordpress.com",
+    "feeds.feedburner.com",
+    "hashnode.com",
+    "hackernoon.com",
+    "qiita.com",
+    "zenn.dev",
+    "reddit.com",
+    "gitlab.com",
+    "notion.site",
+    "x.com",
+}
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS press_sources(host TEXT PRIMARY KEY, name TEXT NOT NULL, evidence TEXT NOT NULL, approved INTEGER NOT NULL, seen INTEGER NOT NULL, verified INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS press_checks(task TEXT PRIMARY KEY, due INTEGER NOT NULL, checked INTEGER, error TEXT);
+CREATE TABLE IF NOT EXISTS press_articles(id INTEGER PRIMARY KEY, url TEXT UNIQUE NOT NULL, host TEXT NOT NULL, title_key TEXT NOT NULL, current_revision INTEGER);
+CREATE INDEX IF NOT EXISTS press_title ON press_articles(host,title_key);
+CREATE TABLE IF NOT EXISTS press_revisions(id INTEGER PRIMARY KEY, article INTEGER NOT NULL, signature TEXT NOT NULL, lang TEXT NOT NULL, title TEXT NOT NULL, excerpt TEXT NOT NULL, original TEXT NOT NULL, published TEXT NOT NULL, observed INTEGER NOT NULL, origin TEXT NOT NULL, rank INTEGER NOT NULL, link TEXT NOT NULL, title_tr TEXT, excerpt_tr TEXT, retry INTEGER NOT NULL DEFAULT 0, error TEXT, UNIQUE(article, signature));
+CREATE INDEX IF NOT EXISTS press_queue ON press_revisions(retry,id) WHERE title_tr IS NULL;
+CREATE INDEX IF NOT EXISTS press_link ON press_revisions(link);
+CREATE INDEX IF NOT EXISTS press_date ON press_revisions(published DESC,id DESC);
+"""
+
+
+def host(url):
+    try:
+        p = urlsplit(url)
+        if p.scheme != "https" or p.username or p.password or p.port not in (443, None):
+            return ""
+        h = (p.hostname or "").lower().removeprefix("www.")
+        return h if re.fullmatch(r"[a-z0-9][a-z0-9.-]*\.[a-z][a-z0-9-]+", h) else ""
+    except ValueError:
+        return ""
+
+
+def canonical(url):
+    if not host(url):
+        return ""
+    p = urlsplit(url)
+    query = [
+        (k, v)
+        for k, v in parse_qsl(p.query, keep_blank_values=True)
+        if not k.lower().startswith("utm_") and k not in ("fbclid", "gclid")
+    ]
+    return urlunsplit(("https", p.netloc.lower(), p.path or "/", urlencode(query), ""))
+
+
+def network_url(url):
+    if not host(url) or urlsplit(url).netloc not in NETWORK:
+        raise ValueError("Kaynak adresi doğrulanamadı")
+    return url
+
+
+class Redirect(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return super().redirect_request(
+            req, fp, code, msg, headers, network_url(newurl)
+        )
+
+
+def fetch(url):
+    req = Request(
+        network_url(url),
+        headers={
+            "User-Agent": "PostgresGundem/1.1 (+https://github.com/EnezMutluoglu/postgres-gundem)"
+        },
+    )
+    with build_opener(Redirect()).open(req, timeout=18) as r:
+        raw = r.read(6_000_001)
+    if len(raw) > 6_000_000:
+        raise ValueError("Akış boyut sınırını aştı")
+    return raw
+
+
+def text(value):
+    if not value:
+        return ""
+    if "<" in value and ">" in value:
+        doc = BeautifulSoup(value, "html.parser")
+        for tag in doc.select("script,style,noscript"):
+            tag.decompose()
+        value = doc.get_text(" ", strip=True)
+    return " ".join(value.split())
+
+
+def excerpt(value):
+    if len(value) <= 680:
+        return value
+    cut = re.search(r"^(.{60,665}[.!?。！？])(?:\s|$)", value)
+    if cut:
+        return cut[1]
+    return value[:660].rsplit(" ", 1)[0] + "…"
+
+
+def date_value(raw):
+    if not raw:
+        return ""
+    try:
+        dt = datetime.fromisoformat(raw.replace("Z", "+00:00").replace(" at ", "T"))
+    except ValueError:
+        try:
+            dt = parsedate_to_datetime(raw)
+        except (ValueError, TypeError, OverflowError):
+            return ""
+    return (
+        (dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc))
+        .astimezone(timezone.utc)
+        .isoformat(timespec="seconds")
+    )
+
+
+def record_source(con, h, name, evidence, approved, ts):
+    if h:
+        approved = approved and h not in SHARED_HOSTS
+        con.execute(
+            """INSERT INTO press_sources VALUES(?,?,?,?,?,?) ON CONFLICT(host) DO UPDATE SET
+          name=CASE WHEN excluded.approved>approved OR name=host THEN excluded.name ELSE name END,
+          evidence=CASE WHEN excluded.approved>approved THEN excluded.evidence ELSE evidence END,
+          approved=max(approved,excluded.approved),seen=max(seen,excluded.seen),verified=max(verified,excluded.verified)""",
+            (h, name or h, evidence, int(approved), ts, ts if approved else 0),
+        )
+
+
+def setup(con):
+    con.executescript(SCHEMA)
+    for _, name, url, h in FEEDS:
+        if h:
+            record_source(con, h, name, url, True, 0)
+
+
+def directory(con, url, raw, ts):
+    doc = BeautifulSoup(raw, "html.parser")
+    links = (
+        doc.select("#pgContentWrap tr td:first-child a[href]")
+        if url == INTL
+        else [
+            a
+            for a in doc.select("li > a[href]")
+            if not a.find("img")
+            and a.parent.select_one('img[alt="RSS"]')
+            and (
+                a.parent.find("ul", recursive=False)
+                or urlsplit(a["href"]).path in ("", "/")
+            )
+        ]
+    )
+    if not links:
+        raise ValueError("Kaynak dizini okunamadı")
+    for a in links:
+        h = host(a["href"].replace("http://", "https://", 1))
+        if h in SHARED_HOSTS:
+            continue
+        record_source(con, h, h, url, True, ts)
+
+
+def store(con, url, h, lang, title, summary, body, pub, origin, rank, ts):
+    url = canonical(url)
+    title = text(title)
+    if not url or not h or not title:
+        return
+    lang = (lang or "und").strip().lower().replace("_", "-")
+    if not re.fullmatch(r"[a-z]{2,3}(?:-[a-z0-9]{2,8})*", lang):
+        lang = "und"
+    key = " ".join(re.findall(r"\w+", title.casefold()))
+    hit = con.execute("SELECT * FROM press_articles WHERE url=?", (url,)).fetchone()
+    if not hit:
+        hit = con.execute(
+            "SELECT a.* FROM press_revisions r JOIN press_articles a ON a.id=r.article WHERE r.link=? LIMIT 1",
+            (url,),
+        ).fetchone()
+    if not hit:
+        # Newspaper search links are opaque. Merge only the search copy with its publisher's native entry.
+        hit = con.execute(
+            """SELECT a.* FROM press_articles a JOIN press_revisions r ON r.id=a.current_revision
+          WHERE a.host=? AND a.title_key=? AND (r.rank=0 OR ?=0) AND substr(r.published,1,10)=? ORDER BY a.id LIMIT 1""",
+            (h, key, rank, pub[:10]),
+        ).fetchone()
+    short = excerpt(text(summary or body))
+    full = text(body or summary)
+    if short == title:
+        short = ""
+    old = None
+    if hit:
+        article = hit["id"]
+        old = con.execute(
+            "SELECT rank,signature FROM press_revisions WHERE id=?",
+            (hit["current_revision"],),
+        ).fetchone()
+    else:
+        article = con.execute(
+            "INSERT INTO press_articles(url,host,title_key) VALUES(?,?,?)",
+            (url, h, key),
+        ).lastrowid
+    signature = hashlib.sha256(
+        json.dumps(
+            [lang, title, short, full, pub, url, origin], ensure_ascii=False
+        ).encode()
+    ).hexdigest()
+    con.execute(
+        """INSERT OR IGNORE INTO press_revisions(article,signature,lang,title,excerpt,original,published,observed,origin,rank,link,title_tr,excerpt_tr)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (
+            article,
+            signature,
+            lang,
+            title,
+            short,
+            full,
+            pub,
+            ts,
+            origin,
+            rank,
+            url,
+            title if lang.split("-")[0] == "tr" else None,
+            short if lang.split("-")[0] == "tr" else None,
+        ),
+    )
+    if old and (old["rank"] > rank or old["signature"] == signature):
+        return
+    revision = con.execute(
+        "SELECT id FROM press_revisions WHERE article=? AND signature=?",
+        (article, signature),
+    ).fetchone()[0]
+    con.execute(
+        "UPDATE press_articles SET current_revision=?,url=?,title_key=? WHERE id=?",
+        (revision, url if rank or not hit else hit["url"], key, article),
+    )
+
+
+def parse_feed(con, raw, lang, name, domain, origin, ts, search=False):
+    if b"<!ENTITY" in raw.upper() or b"<!DOCTYPE" in raw.upper():
+        raise ValueError("Beklenmeyen XML bildirimi")
+    root = ET.fromstring(raw)
+    if root.tag.split("}")[-1] not in ("rss", "feed", "RDF"):
+        raise ValueError("RSS veya Atom bekleniyordu")
+    channel = root.find("{*}channel")
+    default = (
+        root.get("{http://www.w3.org/XML/1998/namespace}lang")
+        or (channel.findtext("{*}language") if channel is not None else None)
+        or lang
+    )
+    for entry in root.findall(".//{*}item") + root.findall("{*}entry"):
+
+        def val(tag):
+            return entry.findtext("{*}" + tag) or ""
+
+        link = next(
+            (
+                element.get("href") or element.text or ""
+                for element in entry.findall("{*}link")
+                if element.get("rel", "alternate") == "alternate"
+            ),
+            "",
+        ).strip()
+        h = host(link)
+        title = text(val("title"))
+        summary = val("summary") or val("description")
+        body = val("encoded") or val("content") or summary
+        if search:
+            publisher = entry.find("{*}source")
+            if publisher is None or h != "news.google.com":
+                continue
+            h = host(publisher.get("url", ""))
+            brand = publisher.text or h
+            record_source(con, h, brand, origin, False, ts)
+            approved = con.execute(
+                "SELECT approved FROM press_sources WHERE host=?", (h,)
+            ).fetchone()
+            if not approved or not approved[0]:
+                continue
+            title = title.removesuffix(" - " + brand)
+            summary = body = ""
+        else:
+            if not h or (domain and h != domain):
+                continue
+            record_source(con, h, name if domain else h, origin, True, ts)
+        language = (
+            entry.get("{http://www.w3.org/XML/1998/namespace}lang")
+            or val("language")
+            or default
+        )
+        if search:
+            # A country's news search includes headlines in other languages.
+            try:
+                guess = detect_langs(title)[0]
+                language = (
+                    guess.lang if guess.prob >= 0.85 and len(title) >= 24 else lang
+                )
+                if language == "tr" and guess.lang != "tr":
+                    language = "und"
+            except LangDetectException:
+                language = "und"
+        store(
+            con,
+            link,
+            h,
+            language,
+            title,
+            summary,
+            body,
+            date_value(
+                val("published") or val("pubDate") or val("updated") or val("date")
+            ),
+            origin,
+            0 if search else 2 if domain else 1,
+            ts,
+        )
+
+
+def planet(con, raw, ts):
+    cards = BeautifulSoup(raw, "html.parser").select(".card-body:has(.planetpost)")
+    if not cards:
+        raise ValueError("Planet yazıları bulunamadı")
+    for card in cards:
+        a = card.select_one("h5 a[href]")
+        stamp = card.select_one(".date")
+        if not a or not stamp:
+            continue
+        h = host(a["href"])
+        record_source(con, h, h, PLANET, True, ts)
+        body = card.select_one(".planetpost").get_text(" ", strip=True)
+        store(
+            con,
+            a["href"],
+            h,
+            "en",
+            a.get_text(" ", strip=True),
+            body,
+            body,
+            date_value(stamp.get_text(strip=True)),
+            PLANET,
+            1,
+            ts,
+        )
+
+
+def jobs():
+    yield DIRECTORY, DIRECTORY, lambda c, b, t: directory(c, DIRECTORY, b, t)
+    yield INTL, INTL, lambda c, b, t: directory(c, INTL, b, t)
+    for lang, name, url, h in FEEDS:
+        yield (
+            url,
+            url,
+            lambda c, b, t, language=lang, publisher=name, domain=h, origin=url: (
+                parse_feed(c, b, language, publisher, domain, origin, t)
+            ),
+        )
+    yield PLANET, PLANET, planet
+    for lang, country in MARKETS.items():
+        query = urlencode(
+            {
+                "q": "(PostgreSQL OR Postgres OR CloudNativePG OR pgBackRest OR pgvector) when:14d",
+                "hl": lang,
+                "gl": country,
+                "ceid": country + ":" + lang,
+            }
+        )
+        yield (
+            "search/" + lang,
+            SEARCH + "?" + query,
+            lambda c, b, t, language=lang: parse_feed(
+                c, b, language, "", "", SEARCH, t, search=True
+            ),
+        )
+
+
+def scan(db, fetcher=fetch, clock=time.time):
+    for task, url, parse in jobs():
+        ts = int(clock())
+        with db() as con:
+            marker = con.execute(
+                "SELECT due FROM press_checks WHERE task=?", (task,)
+            ).fetchone()
+        if marker and marker[0] > ts:
+            continue
+        try:
+            raw = fetcher(url)
+            with db() as con:
+                parse(con, raw, ts)
+                con.execute(
+                    "INSERT OR REPLACE INTO press_checks VALUES(?,?,?,NULL)",
+                    (task, ts + WEEK, ts),
+                )
+        except Exception as exc:
+            logging.warning("Dış basın taranamadı %s: %s", task, exc)
+            with db() as con:
+                con.execute(
+                    """INSERT INTO press_checks(task,due,error) VALUES(?,?,?) ON CONFLICT(task)
+                  DO UPDATE SET due=excluded.due,error=excluded.error""",
+                    (task, ts + 3600, str(exc)[:160]),
+                )
+    # Only retire directory approvals after both directories have refreshed.
+    with db() as con:
+        ts = int(clock())
+        healthy = con.execute(
+            "SELECT count(*) FROM press_checks WHERE task IN (?,?) AND checked>=? AND error IS NULL",
+            (DIRECTORY, INTL, ts - WEEK),
+        ).fetchone()[0]
+        if healthy == 2:
+            seeds = [s[3] for s in FEEDS if s[3]]
+            marks = ",".join("?" for _ in seeds)
+            con.execute(
+                f"UPDATE press_sources SET approved=0 WHERE verified<? AND host NOT IN ({marks})",
+                (ts - 3 * WEEK, *seeds),
+            )
+
+
+def weekly(db):
+    while True:
+        try:
+            scan(db)
+        except Exception:
+            logging.exception("Dış basın takibi kesildi")
+        time.sleep(300)
+
+
+def translate_one(db, translate):
+    ts = int(time.time())
+    with db() as con:
+        row = con.execute(
+            """SELECT r.* FROM press_revisions r JOIN press_articles a ON a.id=r.article
+           WHERE r.title_tr IS NULL AND r.retry<=? ORDER BY (a.current_revision=r.id) DESC,r.published DESC,r.id LIMIT 1""",
+            (ts,),
+        ).fetchone()
+    if not row:
+        return False
+    try:
+        title = translate(row["title"], row["lang"])
+        summary = translate(row["excerpt"], row["lang"]) if row["excerpt"] else ""
+        with db() as con:
+            con.execute(
+                "UPDATE press_revisions SET title_tr=?, excerpt_tr=?, error=NULL WHERE id=?",
+                (title, summary, row["id"]),
+            )
+    except Exception as exc:
+        with db() as con:
+            con.execute(
+                "UPDATE press_revisions SET retry=?,error=? WHERE id=?",
+                (ts + 3600, str(exc)[:160], row["id"]),
+            )
+        if not isinstance(exc, ValueError):
+            time.sleep(20)
+    return True
+
+
+def translations(db, translate):
+    while True:
+        try:
+            if translate_one(db, translate):
+                continue
+        except Exception:
+            logging.exception("Dış basın çevirisi kesildi")
+        time.sleep(20)
+
+
+def register(app, db):
+    @app.get("/api/dis-basin")
+    def press():
+        host_filter = request.args.get("kaynak", "")
+        lang_filter = request.args.get("dil", "")
+        page = max(1, min(request.args.get("sayfa", 1, type=int), 1_000_000))
+        where = " WHERE 1=1"
+        params = []
+        if host_filter:
+            where += " AND a.host=?"
+            params.append(host_filter)
+        if lang_filter:
+            where += " AND r.lang=?"
+            params.append(lang_filter)
+        joined = (
+            " FROM press_articles a JOIN press_revisions r ON r.id=a.current_revision"
+        )
+        with db() as con:
+            con.execute("BEGIN")
+            total = con.execute("SELECT count(*)" + joined + where, params).fetchone()[
+                0
+            ]
+            rows = con.execute(
+                """SELECT a.id,a.url,a.host,r.lang,r.title,r.title_tr,r.excerpt,r.excerpt_tr,r.published,r.observed,r.error,r.origin
+                ,(SELECT count(*) FROM press_revisions v WHERE v.article=a.id) AS versions
+                """
+                + joined
+                + where
+                + " ORDER BY r.published DESC,a.id DESC LIMIT 20 OFFSET ?",
+                [*params, (page - 1) * 20],
+            ).fetchall()
+            sources = con.execute("""SELECT s.host,s.name,count(*) AS articles FROM press_articles a JOIN press_sources s USING(host)
+               GROUP BY s.host ORDER BY s.name""").fetchall()
+            langs = [
+                r[0]
+                for r in con.execute(
+                    "SELECT DISTINCT r.lang" + joined + " ORDER BY r.lang"
+                )
+            ]
+            health = con.execute(
+                "SELECT min(checked), max(checked),sum(error IS NOT NULL),count(*) FROM press_checks"
+            ).fetchone()
+            candidates = con.execute(
+                "SELECT count(*) FROM press_sources WHERE approved=0"
+            ).fetchone()[0]
+        return jsonify(
+            items=[dict(r) for r in rows],
+            sources=[dict(s) for s in sources],
+            languages=langs,
+            total=total,
+            page=page,
+            checked=health[1],
+            errors=health[2] or 0,
+            checked_tasks=health[3],
+            expected_tasks=sum(1 for _ in jobs()),
+            candidates=candidates,
+        )
+
+    @app.get("/api/dis-basin/kaynaklar")
+    def publishers():
+        with db() as con:
+            rows = con.execute(
+                "SELECT host,name,evidence,approved,seen FROM press_sources ORDER BY approved DESC,name"
+            ).fetchall()
+        return jsonify([dict(r) for r in rows])
+
+    @app.get("/api/dis-basin/<int:article>/gecmis")
+    def history(article):
+        with db() as con:
+            rows = con.execute(
+                """SELECT r.title,r.excerpt,r.title_tr,r.excerpt_tr,r.observed,r.lang FROM press_revisions r
+              JOIN press_articles a ON a.id=r.article WHERE a.id=? AND a.current_revision!=r.id ORDER BY r.id DESC""",
+                (article,),
+            ).fetchall()
+        return jsonify([dict(r) for r in rows])

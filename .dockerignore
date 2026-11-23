@@ -5,6 +5,7 @@
 !admin.py
 !archive.py
 !feeds.py
+!community.py
 !turkish.json
 !requirements.txt
 !VERSION

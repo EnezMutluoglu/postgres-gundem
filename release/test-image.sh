@@ -29,6 +29,10 @@ for en,words in samples:
     assert all(word in tr.lower() for word in words) and app.safe_instruction(en,tr),tr
     assert app.reasons_supported(en,tr) and "güvenlik" not in tr.lower(),tr
     print(en, "=>", tr)
+for language,source in [("fr","PostgreSQL 17.2 est disponible."),("ja","PostgreSQL 17.2 がリリースされました。")]:
+    tr=app.press_translation(source,language)
+    assert tr!=source and "PostgreSQL" in tr and "17.2" in tr and not any("\u3040"<=c<="\u30ff" for c in tr),tr
+    print(language,source,"=>",tr)
 PY
 docker stats --no-stream --format '{{.Name}} {{.MemUsage}}' "$name"
 

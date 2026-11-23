@@ -786,7 +786,9 @@ summary {
   .mast nav {
     order: 3;
     width: 100%;
-    gap: 24px;
+    gap: clamp(10px, 3vw, 24px);
+    overflow-x: auto;
+    white-space: nowrap;
     height: 34px;
     margin-top: -8px;
   }

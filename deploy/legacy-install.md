@@ -108,7 +108,7 @@ systemctl list-timers --all postgres-gundem-arsiv.timer
 ls -lh /var/lib/postgres-gundem/arsiv/
 ```
 
-Her ayın 1'inde 03.15 UTC'de (Türkiye saatiyle 06.15) SQLite'ın çevrimiçi yedekleme API'siyle tutarlı bir kopya alınır, doğrulanır ve sıkıştırılır. Son üç aylık dosya tutulur. Haber geçmişi panelden okunabilir. İlk tarama henüz kayıt getirmediyse haberler geldikten sonra `systemctl start postgres-gundem-arsiv.service` ile ilk kopyayı alabilirsiniz. Zamanlamayı kapatmak için `systemctl disable --now postgres-gundem-arsiv.timer` çalıştırın.
+Her ayın 1'inde 03.15 UTC'de (Türkiye saatiyle 06.15) SQLite'ın çevrimiçi yedekleme API'siyle tutarlı bir kopya alınır, doğrulanır ve sıkıştırılır. v1.1.0 ile tüm aylık dosyalar süresiz tutulur. Haber geçmişi panelden okunabilir. İlk tarama henüz kayıt getirmediyse haberler geldikten sonra `systemctl start postgres-gundem-arsiv.service` ile ilk kopyayı alabilirsiniz. Zamanlamayı kapatmak için `systemctl disable --now postgres-gundem-arsiv.timer` çalıştırın.
 
 ```sh
 systemctl status postgres-gundem postgres-gundem-model

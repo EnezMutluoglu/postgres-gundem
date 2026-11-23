@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Dış basın · Postgres Gündem</title>
+    <link rel="icon" href="/static/elephant.png" />
+    <link rel="stylesheet" href="/static/app.css" />
+    <link rel="stylesheet" href="/static/press.css" />
+    <script src="/static/press.js" defer></script>
+  </head>
+  <body>
+    <header class="mast">
+      <div class="shell mast-inner">
+        <a class="brand" href="/"
+          ><img src="/static/elephant.png" alt="" width="37" height="38" /><span
+            >Postgres<span class="brand-light">Gündem</span></span
+          ></a
+        >
+        <nav aria-label="Ana menü">
+          <a href="/">Bülten</a><a href="/#gelistirme">Geliştirme</a
+          ><a href="/#eklentiler">Eklentiler</a
+          ><a href="/dis-basin" class="active" aria-current="page">Dış basın</a
+          ><a href="/ayarlar">Ayarlar</a>
+        </nav>
+      </div>
+    </header>
+    <main class="shell press">
+      <div class="page-heading">
+        <div>
+          <div class="dateline">Haftalık yayın taraması</div>
+          <h1>Dış basın<span>.</span></h1>
+        </div>
+        <button class="refresh" id="reload">Yenile</button>
+      </div>
+      <div class="press-layout">
+        <section aria-label="Dış kaynak haber arşivi">
+          <div class="press-filters">
+            <label
+              >Yayıncı
+              <select id="publisher">
+                <option value="">Tüm yayıncılar</option>
+              </select></label
+            ><label
+              >Özgün dil
+              <select id="language">
+                <option value="">Tüm diller</option>
+              </select></label
+            >
+          </div>
+          <p id="result" class="dateline" role="status"></p>
+          <div id="stories" class="card"></div>
+          <nav class="press-pages" aria-label="Arşiv sayfaları">
+            <button class="refresh" id="previous" disabled>Önceki</button
+            ><span id="pagination"></span
+            ><button class="refresh" id="next" disabled>Sonraki</button>
+          </nav>
+        </section>
+        <aside>
+          <section class="card press-info">
+            <h2>Kaynak takibi</h2>
+            <p id="last">İlk kontrol bekleniyor.</p>
+            <p id="coverage"></p>
+            <details id="directory">
+              <summary>Kaynak listesini incele</summary>
+              <label for="source-search">Yayıncı ara</label
+              ><input
+                id="source-search"
+                type="search"
+                autocomplete="off"
+              /><select id="trust" aria-label="Kaynak durumu">
+                <option value="1">Doğrulanmış kaynaklar</option>
+                <option value="0">Doğrulama bekleyenler</option>
+              </select>
+              <div id="sources"></div>
+            </details>
+          </section>
+        </aside>
+      </div>
+    </main>
+  </body>
+</html>
